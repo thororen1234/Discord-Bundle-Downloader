@@ -3,13 +3,16 @@ import Link from "next/link";
 
 import { formatDate } from "@/lib/format";
 import { type BundleMetadata, channelsOf } from "@/lib/types";
-import { cardClass } from "@/lib/ui";
 
 import { ChannelBadge, LatestBadge } from "./ChannelBadge";
 
 export function BuildCard({ build, latest }: { build: BundleMetadata; latest: boolean; }) {
     return (
-        <Link href={`/build/${build.buildHash}`} prefetch={false} className={cardClass}>
+        <Link
+            href={`/build/${build.buildHash}`}
+            prefetch={false}
+            className="group flex h-full flex-col gap-1.5 rounded-2xl border border-zinc-300 bg-zinc-100 px-5 py-4 text-neutral-800 transition-colors hover:border-zinc-400 hover:no-underline dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300 dark:hover:border-zinc-700"
+        >
             <div className="flex items-center gap-2">
                 <span className="text-lg font-semibold text-neutral-800 tabular-nums dark:text-neutral-200">
                     {build.buildNumber || "?"}

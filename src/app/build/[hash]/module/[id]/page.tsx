@@ -11,7 +11,11 @@ import { formatCount } from "@/lib/format";
 import { getOutgoingDeps } from "@/lib/scraper/deps";
 import { getIndex } from "@/lib/services";
 import { channelLabel, channelsOf } from "@/lib/types";
-import { badgeClass, boxClass, labelClass, latestBadgeClass, mutedTextClass, outlineButtonClass } from "@/lib/ui";
+
+const boxClass = "rounded-2xl border border-zinc-300 bg-zinc-100 text-neutral-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300";
+const labelClass = "text-xs font-medium text-neutral-500 dark:text-neutral-400";
+const mutedTextClass = "text-sm text-neutral-500 dark:text-neutral-400";
+const outlineButtonClass = "inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-100 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-zinc-300 hover:no-underline active:scale-[.97] dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-200 dark:hover:bg-zinc-800";
 
 export async function generateMetadata({ params }: PageProps<"/build/[hash]/module/[id]">): Promise<Metadata> {
     const { hash, id } = await params;
@@ -63,7 +67,7 @@ export default async function ModulePage({ params }: PageProps<"/build/[hash]/mo
             <div className="flex flex-col gap-1.5">
                 <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold text-neutral-800 dark:text-neutral-200">
                     Module <span className="font-mono">{id}</span>
-                    {isEntryPoint && <span className={`${badgeClass} ${latestBadgeClass}`}>Entry point</span>}
+                    {isEntryPoint && <span className="rounded-md bg-rose-500/15 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-rose-600 dark:text-rose-400">Entry point</span>}
                 </h1>
                 <span className={mutedTextClass}>
                     {formatCount(code.length)} characters · in{" "}

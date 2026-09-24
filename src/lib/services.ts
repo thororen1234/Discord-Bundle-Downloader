@@ -1,9 +1,8 @@
-import fs from "fs/promises";
-
 import { sweepArchives } from "./archive";
 import { BuildIndex } from "./buildIndex";
 import { Config } from "./config";
-import { buildPath, ensureBuildsDir } from "./storage";
+import { persistent } from "./global";
+import { ensureBuildsDir } from "./storage";
 import { Tracker } from "./tracker";
 
 interface Services {
@@ -14,15 +13,12 @@ interface Services {
 
 const ARCHIVE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
-const g = globalThis as typeof globalThis & { __bundleDownloader?: Services; };
-
 function services(): Services {
-    if (!g.__bundleDownloader) {
+    return persistent("services", () => {
         const index = new BuildIndex();
         const ready = ensureBuildsDir().then(() => index.populateFromDisk());
-        g.__bundleDownloader = { index, ready, tracker: null };
-    }
-    return g.__bundleDownloader;
+        return { index, ready, tracker: null };
+    });
 }
 
 export async function getIndex(): Promise<BuildIndex> {
@@ -46,13 +42,4 @@ export async function startBackgroundJobs(): Promise<void> {
     const sweep = () => sweepArchives().catch(e => console.error("[archive] sweep failed:", e));
     void sweep();
     setInterval(sweep, ARCHIVE_SWEEP_INTERVAL_MS).unref();
-}
-
-export async function fixupTimestamps(): Promise<void> {
-    const index = await getIndex();
-    for (const meta of index.list()) {
-        const time = new Date(meta.firstSeen);
-        await fs.utimes(buildPath(meta.buildHash), time, time);
-    }
-    await index.populateFromDisk();
 }

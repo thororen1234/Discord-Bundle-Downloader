@@ -1,6 +1,6 @@
-import vm from "vm";
+import { WebpackLazyChunkParser } from "@vencord-companion/webpack-chunk-parser";
 
-import { CHUNK_LOAD_RE, factoryToString } from "./webpack";
+import { CHUNK_LOAD_RE } from "./webpack";
 
 export interface LoadedChunks {
     modules: Record<string, string>;
@@ -19,27 +19,25 @@ export interface ChunkLoaderOptions {
     onProgress?(done: number, total: number): void;
 }
 
-type ChunkPush = [chunkIds: unknown[], modules: Record<string, unknown>, runtime?: unknown];
-
 const CHUNK_GLOBAL = "webpackChunkdiscord_app";
 const RETRIES = 3;
 
 async function fetchText(url: string, userAgent: string): Promise<string | null> {
     for (let attempt = 0; ; attempt++) {
         try {
-            const res = await fetch(url, { headers: { "User-Agent": userAgent } });
-            if (res.status === 404) return null;
-            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-            return await res.text();
-        } catch (e) {
-            if (attempt >= RETRIES) throw e;
+            const response = await fetch(url, { headers: { "User-Agent": userAgent } });
+            if (response.status === 404) return null;
+            if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+            return await response.text();
+        } catch (error) {
+            if (attempt >= RETRIES) throw error;
             await new Promise(r => setTimeout(r, 500 * 2 ** attempt));
         }
     }
 }
 
-export async function loadLazyChunks(opts: ChunkLoaderOptions): Promise<LoadedChunks> {
-    const result: LoadedChunks = { modules: {}, moduleSources: {}, failed: [], skipped: [] };
+export async function loadLazyChunks(options: ChunkLoaderOptions): Promise<LoadedChunks> {
+    const loaded: LoadedChunks = { modules: {}, moduleSources: {}, failed: [], skipped: [] };
 
     const seenIds = new Set<string>();
     const seenFiles = new Set<string>();
@@ -54,58 +52,53 @@ export async function loadLazyChunks(opts: ChunkLoaderOptions): Promise<LoadedCh
     const enqueueId = (id: string) => {
         if (seenIds.has(id)) return;
         seenIds.add(id);
-        const file = opts.chunkFile(id);
+        const file = options.chunkFile(id);
         if (file) enqueueFile(file);
     };
 
-    opts.initialFiles.forEach(enqueueFile);
-    opts.initialChunkIds.forEach(enqueueId);
+    options.initialFiles.forEach(enqueueFile);
+    options.initialChunkIds.forEach(enqueueId);
 
-    const ctx = vm.createContext({});
-    ctx.self = ctx;
-    ctx.window = ctx;
-
-    const runChunk = (file: string, code: string) => {
-        const pushed: ChunkPush[] = [];
-        ctx[CHUNK_GLOBAL] = { push: (entry: ChunkPush) => void pushed.push(entry) };
-        try {
-            vm.runInContext(code, ctx, { filename: file, timeout: 10_000 });
-        } catch { }
-        if (!pushed.length) {
-            result.skipped.push(file);
+    const parseChunk = (file: string, code: string) => {
+        let modules: Record<string, string> | undefined;
+        if (code.includes(CHUNK_GLOBAL)) {
+            try {
+                modules = new WebpackLazyChunkParser(code).getDefinedModules();
+            } catch (error) {
+                console.warn(`[scraper] failed to parse chunk ${file}:`, error);
+            }
+        }
+        if (!modules || !Object.keys(modules).length) {
+            loaded.skipped.push(file);
             return;
         }
 
         const ids: number[] = [];
-        for (const [, modules] of pushed) {
-            if (!modules || typeof modules !== "object") continue;
-            for (const id in modules) {
-                const src = factoryToString(modules[id]);
-                result.modules[id] = src;
-                ids.push(Number(id));
-                for (const [, chunkId] of src.matchAll(CHUNK_LOAD_RE)) enqueueId(chunkId);
-            }
+        for (const [id, src] of Object.entries(modules)) {
+            loaded.modules[id] = src;
+            ids.push(Number(id));
+            for (const [, chunkId] of src.matchAll(CHUNK_LOAD_RE)) enqueueId(chunkId);
         }
-        result.moduleSources[file] = ids;
+        loaded.moduleSources[file] = ids;
     };
 
-    const worker = async () => {
+    const loadQueuedChunks = async () => {
         for (let file = queue.shift(); file != null; file = queue.shift()) {
             try {
-                const code = await fetchText(opts.assetBase + file, opts.userAgent);
-                if (code == null) result.failed.push(file);
-                else runChunk(file, code);
-            } catch (e) {
-                console.warn(`[scraper] failed to load chunk ${file}:`, e);
-                result.failed.push(file);
+                const code = await fetchText(options.assetBase + file, options.userAgent);
+                if (code == null) loaded.failed.push(file);
+                else parseChunk(file, code);
+            } catch (error) {
+                console.warn(`[scraper] failed to load chunk ${file}:`, error);
+                loaded.failed.push(file);
             }
-            opts.onProgress?.(++done, seenFiles.size);
+            options.onProgress?.(++done, seenFiles.size);
         }
     };
 
     while (queue.length) {
-        await Promise.all(Array.from({ length: opts.concurrency }, worker));
+        await Promise.all(Array.from({ length: options.concurrency }, loadQueuedChunks));
     }
 
-    return result;
+    return loaded;
 }

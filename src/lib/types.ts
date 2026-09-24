@@ -1,6 +1,6 @@
 export type Channel = "stable" | "canary";
 
-export type ModuleId = string;
+export const CHANNELS: readonly Channel[] = ["stable", "canary"];
 
 export interface BundleMetadata {
     buildHash: string;
@@ -10,34 +10,31 @@ export interface BundleMetadata {
     channels?: Channel[];
 }
 
-export interface IncomingModuleDeps {
+export interface ModuleDeps {
     sync: number[];
     lazy: number[];
 }
 
 export interface DepInfo {
     keyModules: { fluxDispatcherClass: [number, string][]; };
-    moduleDeps: Record<ModuleId, IncomingModuleDeps>;
+    moduleDeps: Record<string, ModuleDeps>;
 }
 
 export interface FullBundle {
     metadata: BundleMetadata;
     depInfo: DepInfo;
     moduleSources: Record<string, number[]>;
-    modules: Record<ModuleId, string>;
+    modules: Record<string, string>;
     envVarText: string;
 }
 
-export interface TimestampQueryResults {
-    before: BundleMetadata | null;
-    after: BundleMetadata | null;
+export function isChannel(value: unknown): value is Channel {
+    return CHANNELS.includes(value as Channel);
 }
-
-const CHANNEL_ORDER: Channel[] = ["stable", "canary"];
 
 export function channelsOf(meta: BundleMetadata): Channel[] {
     const channels = meta.channels?.length ? meta.channels : ["stable"];
-    return CHANNEL_ORDER.filter(c => channels.includes(c));
+    return CHANNELS.filter(c => channels.includes(c));
 }
 
 export function withChannels(meta: BundleMetadata): BundleMetadata {

@@ -5,13 +5,13 @@ import path from "path";
 import { promisify } from "util";
 
 import { Config } from "./config";
+import { persistent } from "./global";
 import { ARCHIVE_FILE_NAME, buildPath, buildsRoot, exists, readFullBundle, readMetadata } from "./storage";
 import { withChannels } from "./types";
 
 const execFileAsync = promisify(execFile);
 
-const g = globalThis as typeof globalThis & { __archivesInFlight?: Map<string, Promise<string>>; };
-const inFlight = g.__archivesInFlight ??= new Map();
+const inFlight = persistent("archivesInFlight", () => new Map<string, Promise<string>>());
 
 async function sevenZipBinary(): Promise<string> {
     if (Config.sevenZipPath) return Config.sevenZipPath;

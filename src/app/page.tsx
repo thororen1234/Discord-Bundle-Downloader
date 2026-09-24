@@ -10,9 +10,11 @@ import { Config } from "@/lib/config";
 import { shortHash, timeAgo } from "@/lib/format";
 import { getIndex, getTracker } from "@/lib/services";
 import { type Channel, channelsOf } from "@/lib/types";
-import { boxClass, mutedTextClass, outlineButtonClass, tabClass, tabGroupClass } from "@/lib/ui";
 
 const INITIAL_COUNT = 24;
+const boxClass = "rounded-2xl border border-zinc-300 bg-zinc-100 text-neutral-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300";
+const mutedTextClass = "text-sm text-neutral-500 dark:text-neutral-400";
+const outlineButtonClass = "inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-100 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-zinc-300 hover:no-underline active:scale-[.97] dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-200 dark:hover:bg-zinc-800";
 
 const FILTERS: { label: string; value?: Channel; }[] = [
     { label: "All" },
@@ -26,6 +28,13 @@ function filterHref(channel: Channel | undefined, all: boolean) {
     if (all) params.set("all", "1");
     const query = params.toString();
     return query ? `/?${query}` : "/";
+}
+
+function tabClass(active: boolean) {
+    const color = active
+        ? "bg-zinc-100 text-neutral-900 shadow-sm dark:bg-zinc-700 dark:text-neutral-100"
+        : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100";
+    return `flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:no-underline ${color}`;
 }
 
 export default async function Home({ searchParams }: PageProps<"/">) {
@@ -70,7 +79,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                                         </span>
                                     </div>
                                     <span className="text-lg font-semibold text-neutral-800 tabular-nums dark:text-neutral-200">
-                                        {known ? known.buildNumber : "—"}
+                                        {known ? known.buildNumber : "-"}
                                     </span>
                                     <span className="truncate font-mono text-xs text-neutral-500">
                                         {status.buildHash && known
@@ -124,7 +133,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </Section>
 
             <Section icon={Package} title="Builds" badge={<span className="text-neutral-500">({builds.length})</span>}>
-                <div className={tabGroupClass} role="group" aria-label="Release channel">
+                <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
                     {FILTERS.map(f => (
                         <Link
                             key={f.label}

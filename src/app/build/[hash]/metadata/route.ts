@@ -1,4 +1,4 @@
-import { textResponse, ZSTD_MIME_TYPE } from "@/lib/http";
+import { attachment, downloadName, textResponse, ZSTD_MIME_TYPE } from "@/lib/http";
 import { getIndex } from "@/lib/services";
 import { isValidBuildHash, packMetadataZst } from "@/lib/storage";
 
@@ -8,5 +8,7 @@ export async function GET(_request: Request, { params }: RouteContext<"/build/[h
 
     const meta = (await getIndex()).get(hash);
     if (!meta) return textResponse(404, `build ${hash} not found`);
-    return new Response(new Uint8Array(packMetadataZst(meta)), { headers: { "Content-Type": ZSTD_MIME_TYPE } });
+    return new Response(new Uint8Array(packMetadataZst(meta)), {
+        headers: { "Content-Type": ZSTD_MIME_TYPE, ...attachment(downloadName(meta, ".meta.mpk.zst")) },
+    });
 }

@@ -22,18 +22,18 @@ export class BuildIndex {
         }));
 
         this.byHash = new Map(metas.filter(m => m != null).map(m => [m.buildHash, m]));
-        this.sort();
+        this.rebuildTimeIndex();
         console.log(`[index] loaded ${this.byHash.size} builds`);
     }
 
-    private sort() {
+    private rebuildTimeIndex() {
         this.byTime = [...this.byHash.values()].sort((a, b) => a.firstSeen - b.firstSeen);
     }
 
     add(meta: BundleMetadata) {
         meta = withChannels(meta);
         this.byHash.set(meta.buildHash, meta);
-        this.sort();
+        this.rebuildTimeIndex();
     }
 
     get(buildHash: string): BundleMetadata | undefined {

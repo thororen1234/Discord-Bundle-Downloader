@@ -1,4 +1,4 @@
-import type { DepInfo, IncomingModuleDeps } from "../types";
+import type { DepInfo, ModuleDeps } from "../types";
 
 export interface OutgoingDeps {
     sync: number[];
@@ -29,7 +29,7 @@ export function getOutgoingDeps(code: string): OutgoingDeps | null {
 }
 
 export function computeDepInfo(modules: Record<string, string>): DepInfo {
-    const moduleDeps: Record<string, IncomingModuleDeps> = {};
+    const moduleDeps: Record<string, ModuleDeps> = {};
     const incoming = (id: number) => moduleDeps[id] ??= { sync: [], lazy: [] };
 
     for (const [id, code] of Object.entries(modules)) {

@@ -10,10 +10,16 @@ import { getFullBundle } from "@/lib/bundleCache";
 import { formatCount, formatDate, shortHash, timeAgo } from "@/lib/format";
 import { getIndex } from "@/lib/services";
 import { channelLabel, channelsOf } from "@/lib/types";
-import { boxClass, buttonClass, cardClass, fieldClass, labelClass, mutedTextClass, outlineButtonClass } from "@/lib/ui";
 
 const MAX_RESULTS = 100;
 const SNIPPET_RADIUS = 80;
+const boxClass = "rounded-2xl border border-zinc-300 bg-zinc-100 text-neutral-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300";
+const buttonClass = "inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl bg-zinc-200 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-zinc-300 hover:no-underline active:scale-[.97] dark:bg-zinc-800 dark:text-neutral-200 dark:hover:bg-zinc-700";
+const cardClass = "group flex h-full flex-col gap-1.5 rounded-2xl border border-zinc-300 bg-zinc-100 px-5 py-4 text-neutral-800 transition-colors hover:border-zinc-400 hover:no-underline dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300 dark:hover:border-zinc-700";
+const fieldClass = "w-full rounded-xl bg-zinc-200 px-3 py-2 text-sm text-neutral-800 ring-1 ring-transparent outline-none placeholder:text-neutral-500 focus:ring-rose-500 dark:bg-zinc-800 dark:text-neutral-200";
+const labelClass = "text-xs font-medium text-neutral-500 dark:text-neutral-400";
+const mutedTextClass = "text-sm text-neutral-500 dark:text-neutral-400";
+const outlineButtonClass = "inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-100 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-zinc-300 hover:no-underline active:scale-[.97] dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-200 dark:hover:bg-zinc-800";
 
 export async function generateMetadata({ params }: PageProps<"/build/[hash]">): Promise<Metadata> {
     const { hash } = await params;
@@ -97,7 +103,7 @@ export default async function BuildPage({ params, searchParams }: PageProps<"/bu
             <div className="grid gap-3 sm:grid-cols-3">
                 <Stat label="Modules" value={formatCount(moduleCount)} />
                 <Stat label="Chunks" value={formatCount(chunkCount)} />
-                <Stat label="Entry point" value={meta.entryPoint != null ? String(meta.entryPoint) : "—"} />
+                <Stat label="Entry point" value={meta.entryPoint != null ? String(meta.entryPoint) : "-"} />
             </div>
 
             <div className="flex flex-wrap gap-2">

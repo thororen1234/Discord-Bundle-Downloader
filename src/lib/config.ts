@@ -1,8 +1,6 @@
 import path from "path";
 
-import type { Channel } from "./types";
-
-const CHANNELS: readonly Channel[] = ["stable", "canary"];
+import { type Channel, isChannel } from "./types";
 
 function intEnv(name: string, fallback: number): number {
     const raw = process.env[name];
@@ -13,12 +11,19 @@ function intEnv(name: string, fallback: number): number {
 }
 
 function channelsEnv(): Channel[] {
-    const raw = process.env.TRACK_CHANNELS ?? "stable";
-    const channels = raw.split(",").map(c => c.trim().toLowerCase()).filter(Boolean);
-    for (const c of channels) {
-        if (!CHANNELS.includes(c as Channel)) throw new Error(`Unknown channel "${c}" in TRACK_CHANNELS`);
+    const channels = new Set<Channel>();
+    for (const raw of (process.env.TRACK_CHANNELS ?? "stable").split(",")) {
+        const channel = raw.trim().toLowerCase();
+        if (!channel) continue;
+        if (!isChannel(channel)) throw new Error(`Unknown channel "${channel}" in TRACK_CHANNELS`);
+        channels.add(channel);
     }
-    return [...new Set(channels)] as Channel[];
+
+    if (channels.size === 0) {
+        throw new Error("TRACK_CHANNELS must include at least one channel");
+    }
+
+    return [...channels];
 }
 
 export const Config = {
@@ -28,7 +33,6 @@ export const Config = {
     pollIntervalMs: intEnv("POLL_INTERVAL_SECONDS", 30) * 1000,
     chunkConcurrency: intEnv("CHUNK_CONCURRENCY", 50),
     bundleCacheSize: intEnv("BUNDLE_CACHE_SIZE", 2),
-    adminToken: process.env.ADMIN_TOKEN || null,
     sevenZipPath: process.env.SEVEN_ZIP_PATH || null,
     archiveTtlMs: 7 * 24 * 60 * 60 * 1000,
     userAgent: "Discord-Bundle-Downloader/1.0",

@@ -42,7 +42,7 @@ export async function ensureBuildsDir(): Promise<void> {
         await fs.writeFile(verPath, FORMAT_VERSION);
     } else if (version !== FORMAT_VERSION) {
         throw new Error(
-            `${verPath} is version ${version}, expected ${FORMAT_VERSION}. Run explorer_server once to migrate it.`
+            `${verPath} is version ${version}, expected ${FORMAT_VERSION}.`
         );
     }
 }

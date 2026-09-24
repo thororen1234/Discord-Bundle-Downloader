@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
         GIT_HASH: gitHash(),
     },
     // 7zip-bin resolves its bundled binary relative to its own install dir, so it can't be bundled
-    serverExternalPackages: ["7zip-bin"],
+    serverExternalPackages: ["7zip-bin", "@vencord-companion/webpack-chunk-parser", "typescript"],
     async headers() {
         return [
             { source: "/build/:path*", headers: CORS_HEADERS },

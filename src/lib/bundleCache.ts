@@ -1,9 +1,9 @@
 import { Config } from "./config";
+import { persistent } from "./global";
 import { readFullBundle } from "./storage";
 import type { FullBundle } from "./types";
 
-const g = globalThis as typeof globalThis & { __bundleCache?: Map<string, Promise<FullBundle>>; };
-const cache = g.__bundleCache ??= new Map();
+const cache = persistent("bundleCache", () => new Map<string, Promise<FullBundle>>());
 
 export function getFullBundle(buildHash: string): Promise<FullBundle> {
     let bundle = cache.get(buildHash);
