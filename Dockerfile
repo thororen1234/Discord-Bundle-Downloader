@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends 7zip && rm -rf 
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=8484 HOSTNAME=0.0.0.0 DATA_DIR=/data SEVEN_ZIP_PATH=/usr/bin/7zz
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 VOLUME /data
 EXPOSE 8484
 CMD ["node", "server.js"]

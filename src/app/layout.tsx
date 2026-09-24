@@ -1,33 +1,32 @@
 import "./globals.css";
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
+
+import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
     title: {
-        default: "Discord Bundle Downloader",
-        template: "%s · Discord Bundle Downloader",
+        default: "Discord Build Tracker",
+        template: "%s · Discord Build Tracker",
     },
     description: "Tracks Discord web builds and archives every webpack module they ship.",
 };
 
+const themeScript = "try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';localStorage.setItem('theme',t)}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','dark')}";
+
 export default function RootLayout({ children }: { children: ReactNode; }) {
     return (
-        <html lang="en">
-            <body className="min-h-screen">
-                <header className="border-b border-zinc-800 bg-zinc-900/60">
-                    <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-                        <Link href="/" className="font-semibold text-zinc-100 hover:text-white hover:no-underline">
-                            Discord Bundle Downloader
-                        </Link>
-                        <nav className="flex gap-4 text-sm">
-                            <Link href="/">Builds</Link>
-                            <a href="/builds/latest/meta">API</a>
-                        </nav>
-                    </div>
-                </header>
-                <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <html lang="en" suppressHydrationWarning>
+            <head>
+                <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+                <link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+            </head>
+            <body>
+                <div className="flex min-h-dvh flex-col">
+                    <Header />
+                    <main className="flex flex-1 flex-col gap-8 px-3 pt-6 pb-10">{children}</main>
+                </div>
             </body>
         </html>
     );

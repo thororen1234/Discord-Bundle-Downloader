@@ -16,8 +16,10 @@ export function timeAgo(time: number, now = Date.now()): string {
     return "";
 }
 
+const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
+
 export function formatDate(time: number): string {
-    return new Date(time).toISOString().replace("T", " ").slice(0, 19) + " UTC";
+    return `${dateFormat.format(time)} UTC`;
 }
 
 export function shortHash(hash: string): string {
