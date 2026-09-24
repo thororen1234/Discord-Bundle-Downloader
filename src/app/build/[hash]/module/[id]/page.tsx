@@ -11,7 +11,7 @@ import { formatCount } from "@/lib/format";
 import { getOutgoingDeps } from "@/lib/scraper/deps";
 import { getIndex } from "@/lib/services";
 import { channelLabel, channelsOf } from "@/lib/types";
-import { badgeClass, boxClass, buttonClass, labelClass, latestBadgeClass, mutedTextClass } from "@/lib/ui";
+import { badgeClass, boxClass, labelClass, latestBadgeClass, mutedTextClass, outlineButtonClass } from "@/lib/ui";
 
 export async function generateMetadata({ params }: PageProps<"/build/[hash]/module/[id]">): Promise<Metadata> {
     const { hash, id } = await params;
@@ -84,7 +84,7 @@ export default async function ModulePage({ params }: PageProps<"/build/[hash]/mo
                 icon={Code}
                 title="Source"
                 action={
-                    <a href={`/build/${hash}/module/${id}/raw`} className={`py-1.5 ${buttonClass}`}>
+                    <a href={`/build/${hash}/module/${id}/raw`} className={`py-1.5 ${outlineButtonClass}`}>
                         <FileText size={14} /> Raw
                     </a>
                 }

@@ -10,7 +10,7 @@ import { getFullBundle } from "@/lib/bundleCache";
 import { formatCount, formatDate, shortHash, timeAgo } from "@/lib/format";
 import { getIndex } from "@/lib/services";
 import { channelLabel, channelsOf } from "@/lib/types";
-import { boxClass, buttonClass, cardClass, fieldClass, labelClass, mutedTextClass } from "@/lib/ui";
+import { boxClass, buttonClass, cardClass, fieldClass, labelClass, mutedTextClass, outlineButtonClass } from "@/lib/ui";
 
 const MAX_RESULTS = 100;
 const SNIPPET_RADIUS = 80;
@@ -101,24 +101,24 @@ export default async function BuildPage({ params, searchParams }: PageProps<"/bu
             </div>
 
             <div className="flex flex-wrap gap-2">
-                <a href={`/build/archive/${hash}.7z`} className={buttonClass}>
+                <a href={`/build/archive/${hash}.7z`} className={outlineButtonClass}>
                     <FolderDown size={16} className="text-rose-500" /> Download .7z
                 </a>
-                <a href={`/build/${hash}/full`} className={buttonClass}>
+                <a href={`/build/${hash}/full`} className={outlineButtonClass}>
                     <FileArchive size={16} /> data.mpk.zst
                 </a>
-                <a href={`/build/${hash}/metadata`} className={buttonClass}>
+                <a href={`/build/${hash}/metadata`} className={outlineButtonClass}>
                     <Braces size={16} /> meta.mpk.zst
                 </a>
                 {meta.entryPoint != null && (
-                    <Link href={`/build/${hash}/module/${meta.entryPoint}`} className={buttonClass}>
+                    <Link href={`/build/${hash}/module/${meta.entryPoint}`} className={outlineButtonClass}>
                         <FileCode size={16} /> Entry point module
                     </Link>
                 )}
             </div>
 
             <Section icon={Search} title="Modules">
-                <div className="flex flex-wrap gap-2">
+                <div className={`flex flex-wrap gap-2 px-5 py-4 ${boxClass}`}>
                     <form className="flex min-w-72 flex-1 gap-2">
                         <input
                             name="q"

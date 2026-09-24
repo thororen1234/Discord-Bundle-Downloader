@@ -10,7 +10,7 @@ import { Config } from "@/lib/config";
 import { shortHash, timeAgo } from "@/lib/format";
 import { getIndex, getTracker } from "@/lib/services";
 import { type Channel, channelsOf } from "@/lib/types";
-import { boxClass, buttonClass, mutedTextClass, tabClass, tabGroupClass } from "@/lib/ui";
+import { boxClass, mutedTextClass, outlineButtonClass, tabClass, tabGroupClass } from "@/lib/ui";
 
 const INITIAL_COUNT = 24;
 
@@ -152,7 +152,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 )}
 
                 {!showAll && builds.length > INITIAL_COUNT && (
-                    <Link href={filterHref(channel, true)} className={`self-center ${buttonClass}`}>
+                    <Link href={filterHref(channel, true)} className={`self-center ${outlineButtonClass}`}>
                         Show all {builds.length} builds
                     </Link>
                 )}

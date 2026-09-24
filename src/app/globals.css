@@ -23,6 +23,8 @@ body {
     font-variant-ligatures: none;
 }
 
-a {
-    @apply text-rose-600 hover:underline dark:text-rose-400;
+@layer base {
+    a {
+        @apply text-rose-600 hover:underline dark:text-rose-400;
+    }
 }
