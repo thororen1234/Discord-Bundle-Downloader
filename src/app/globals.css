@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, monospace;
+}
+
+:root {
+    color-scheme: dark;
+}
+
+body {
+    @apply bg-zinc-950 text-zinc-200 antialiased;
+}
+
+.font-mono {
+    font-variant-ligatures: none;
+}
+
+a {
+    @apply text-indigo-300 hover:text-indigo-200 hover:underline;
+}
