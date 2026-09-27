@@ -26,6 +26,7 @@ interface Failure {
 
 const MIN_RETRY_MS = 60 * 1000;
 const MAX_RETRY_MS = 60 * MIN_RETRY_MS;
+const CHECK_TIMEOUT_MS = 20 * 1000;
 
 export class Tracker {
     readonly status = {} as Record<Channel, ChannelStatus>;
@@ -68,7 +69,10 @@ export class Tracker {
         const status = this.status[channel];
         let response: Response;
         try {
-            response = await fetch(`${APP_ORIGINS[channel]}/app`, { headers: { "User-Agent": Config.userAgent } });
+            response = await fetch(`${APP_ORIGINS[channel]}/app`, {
+                headers: { "User-Agent": Config.userAgent },
+                signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+            });
         } catch (error) {
             status.error = `Failed to reach Discord: ${error}`;
             return;
@@ -105,7 +109,13 @@ export class Tracker {
             return;
         }
 
-        const html = await response.text();
+        let html: string;
+        try {
+            html = await response.text();
+        } catch (error) {
+            status.error = `Failed to read Discord response: ${error}`;
+            return;
+        }
         const job: ScrapeJob = { buildHash, channel, startedAt: Date.now(), progress: null };
         this.jobs.set(buildHash, job);
         this.queue = this.queue.then(() => this.scrape(job, html));
