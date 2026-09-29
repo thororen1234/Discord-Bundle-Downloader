@@ -10,6 +10,22 @@ function intEnv(name: string, fallback: number): number {
     return value;
 }
 
+function nonNegativeIntEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 0) throw new Error(`${name} must be a non-negative integer, got "${raw}"`);
+    return value;
+}
+
+function boolEnv(name: string, fallback: boolean): boolean {
+    const raw = process.env[name];
+    if (raw == null) return fallback;
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    throw new Error(`${name} must be "true" or "false", got "${raw}"`);
+}
+
 function channelsEnv(): Channel[] {
     const channels = new Set<Channel>();
     for (const raw of (process.env.TRACK_CHANNELS ?? "stable").split(",")) {
@@ -32,7 +48,11 @@ export const Config = {
     channels: channelsEnv(),
     pollIntervalMs: intEnv("POLL_INTERVAL_SECONDS", 30) * 1000,
     chunkConcurrency: intEnv("CHUNK_CONCURRENCY", 50),
-    bundleCacheSize: intEnv("BUNDLE_CACHE_SIZE", 2),
+    // Decoded bundles are large. Keep this off on small servers unless repeated UI reads need it.
+    bundleCacheSize: nonNegativeIntEnv("BUNDLE_CACHE_SIZE", 0),
+    archivePrebuild: boolEnv("ARCHIVE_PREBUILD", false),
+    archiveThreads: intEnv("ARCHIVE_THREADS", 1),
+    archiveCompressionLevel: intEnv("ARCHIVE_COMPRESSION_LEVEL", 3),
     sevenZipPath: process.env.SEVEN_ZIP_PATH || null,
     archiveTtlMs: 7 * 24 * 60 * 60 * 1000,
     userAgent: "Discord-Bundle-Downloader/1.0",

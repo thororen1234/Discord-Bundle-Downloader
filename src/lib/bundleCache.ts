@@ -6,6 +6,8 @@ import type { FullBundle } from "./types";
 const cache = persistent("bundleCache", () => new Map<string, Promise<FullBundle>>());
 
 export function getFullBundle(buildHash: string): Promise<FullBundle> {
+    if (Config.bundleCacheSize === 0) return readFullBundle(buildHash);
+
     let bundle = cache.get(buildHash);
     if (bundle) {
         cache.delete(buildHash);

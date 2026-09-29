@@ -138,9 +138,11 @@ export class Tracker {
 
             const seconds = ((Date.now() - job.startedAt) / 1000).toFixed(1);
             console.log(`[tracker] saved ${channel} build ${bundle.metadata.buildNumber} (${buildHash}) in ${seconds}s`);
-            void getArchive(buildHash).catch(error => {
-                console.error(`[tracker] failed to prebuild ${buildHash}.7z:`, error);
-            });
+            if (Config.archivePrebuild) {
+                void getArchive(buildHash).catch(error => {
+                    console.error(`[tracker] failed to prebuild ${buildHash}.7z:`, error);
+                });
+            }
         } catch (error) {
             this.recordFailure(buildHash, channel, error);
         } finally {

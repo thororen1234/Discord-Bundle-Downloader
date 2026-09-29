@@ -38,7 +38,17 @@ async function createArchive(buildHash: string, target: string): Promise<void> {
         await fs.writeFile(path.join(srcDir, "modules.json"), JSON.stringify(bundle.moduleSources));
 
         const out = path.join(workDir, ARCHIVE_FILE_NAME);
-        await execFileAsync(await sevenZipBinary(), ["a", "-t7z", "-mx=6", "-md=16m", "-mmt=on", "-bd", "-bso0", out, "."], {
+        await execFileAsync(await sevenZipBinary(), [
+            "a",
+            "-t7z",
+            `-mx=${Config.archiveCompressionLevel}`,
+            "-md=16m",
+            `-mmt=${Config.archiveThreads}`,
+            "-bd",
+            "-bso0",
+            out,
+            ".",
+        ], {
             cwd: srcDir,
             maxBuffer: 16 * 1024 * 1024,
         });
