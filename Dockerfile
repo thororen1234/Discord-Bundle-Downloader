@@ -1,23 +1,39 @@
 FROM node:lts-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
-
-FROM base AS build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+FROM base AS build
 RUN pnpm install --frozen-lockfile
 COPY . .
 ARG GIT_HASH=unknown
 ENV GIT_HASH=$GIT_HASH NEXT_TELEMETRY_DISABLED=1 BUILD_STANDALONE=1
+
+FROM build AS build-web
 RUN pnpm build
 
-FROM node:lts-slim
+FROM build AS build-scraper
+RUN pnpm build:scraper
+
+FROM base AS prod-deps
+RUN pnpm install --prod --frozen-lockfile
+
+FROM node:lts-slim AS runtime
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends 7zip && rm -rf /var/lib/apt/lists/*
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=8484 HOSTNAME=0.0.0.0 DATA_DIR=/data SEVEN_ZIP_PATH=/usr/bin/7zz
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+ENV NODE_ENV=production DATA_DIR=/data SEVEN_ZIP_PATH=/usr/bin/7zz
 VOLUME /data
+
+FROM runtime AS scraper
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build-scraper /app/dist/scraper.mjs ./
+CMD ["node", "scraper.mjs"]
+
+FROM runtime AS web
+ENV NEXT_TELEMETRY_DISABLED=1 PORT=8484 HOSTNAME=0.0.0.0
+COPY --from=build-web /app/.next/standalone ./
+COPY --from=build-web /app/.next/static ./.next/static
+COPY --from=build-web /app/public ./public
 EXPOSE 8484
 CMD ["node", "server.js"]

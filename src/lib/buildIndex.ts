@@ -1,29 +1,45 @@
 import fs from "fs/promises";
 import path from "path";
 
-import { buildsRoot, exists, METADATA_FILE_NAME, readMetadata } from "./storage";
+import { buildsRoot, METADATA_FILE_NAME, readMetadata } from "./storage";
 import { type BundleMetadata, type Channel, channelsOf, withChannels } from "./types";
 
 export class BuildIndex {
     private byHash = new Map<string, BundleMetadata>();
     private byTime: BundleMetadata[] = [];
+    private mtimes = new Map<string, number>();
+    private loaded = false;
 
-    async populateFromDisk(): Promise<void> {
+    async refresh(): Promise<void> {
         const entries = await fs.readdir(buildsRoot(), { withFileTypes: true });
-        const metas = await Promise.all(entries.map(async entry => {
-            if (!entry.isDirectory()) return null;
-            if (!await exists(path.join(buildsRoot(), entry.name, METADATA_FILE_NAME))) return null;
+        const next = new Map<string, BundleMetadata>();
+        const mtimes = new Map<string, number>();
+        await Promise.all(entries.map(async entry => {
+            if (!entry.isDirectory()) return;
+            const stat = await fs.stat(path.join(buildsRoot(), entry.name, METADATA_FILE_NAME)).catch(() => null);
+            if (!stat) return;
+
+            const known = this.byHash.get(entry.name);
+            if (known && this.mtimes.get(entry.name) === stat.mtimeMs) {
+                next.set(entry.name, known);
+                mtimes.set(entry.name, stat.mtimeMs);
+                return;
+            }
             try {
-                return withChannels(await readMetadata(entry.name));
+                next.set(entry.name, withChannels(await readMetadata(entry.name)));
+                mtimes.set(entry.name, stat.mtimeMs);
             } catch (e) {
                 console.warn(`[index] skipping build ${entry.name}, metadata is unreadable:`, e);
-                return null;
             }
         }));
 
-        this.byHash = new Map(metas.filter(m => m != null).map(m => [m.buildHash, m]));
+        const changed = next.size !== this.byHash.size || [...next].some(([hash, meta]) => this.byHash.get(hash) !== meta);
+        this.byHash = next;
+        this.mtimes = mtimes;
+        if (!changed && this.loaded) return;
         this.rebuildTimeIndex();
         console.log(`[index] loaded ${this.byHash.size} builds`);
+        this.loaded = true;
     }
 
     private rebuildTimeIndex() {

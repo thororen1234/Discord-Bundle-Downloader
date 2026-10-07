@@ -12,6 +12,13 @@ env:
 jobs:
     build:
         runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                include:
+                    - target: web
+                      suffix: ""
+                    - target: scraper
+                      suffix: "-scraper"
         permissions:
             contents: read
             packages: write
@@ -31,7 +38,7 @@ jobs:
               id: meta
               uses: docker/metadata-action@v6
               with:
-                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.suffix }}
                   tags: |
                       type=ref,event=branch
                       type=ref,event=pr
@@ -47,6 +54,7 @@ jobs:
               uses: docker/build-push-action@v7
               with:
                   context: .
+                  target: ${{ matrix.target }}
                   platforms: linux/amd64
                   push: ${{ github.event_name != 'pull_request' }}
                   tags: ${{ steps.meta.outputs.tags }}
@@ -54,7 +62,7 @@ jobs:
                   annotations: ${{ steps.meta.outputs.annotations }}
                   build-args: |
                       GIT_HASH=${{ github.sha }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+                  cache-from: type=gha,scope=${{ matrix.target }}
+                  cache-to: type=gha,mode=max,scope=${{ matrix.target }}
                   provenance: true
                   sbom: true

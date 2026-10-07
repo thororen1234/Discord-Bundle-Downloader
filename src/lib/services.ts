@@ -1,43 +1,47 @@
 import { sweepArchives } from "./archive";
 import { BuildIndex } from "./buildIndex";
-import { Config } from "./config";
 import { persistent } from "./global";
 import { ensureBuildsDir } from "./storage";
-import { Tracker } from "./tracker";
 
 interface Services {
     index: BuildIndex;
     ready: Promise<void>;
-    tracker: Tracker | null;
+    refreshedAt: number;
+    refreshing: Promise<void> | null;
+    jobsStarted: boolean;
 }
 
 const ARCHIVE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+const INDEX_REFRESH_MS = 5 * 1000;
 
 function services(): Services {
     return persistent("services", () => {
         const index = new BuildIndex();
-        const ready = ensureBuildsDir().then(() => index.populateFromDisk());
-        return { index, ready, tracker: null };
+        const ready = ensureBuildsDir().then(() => index.refresh());
+        return { index, ready, refreshedAt: Date.now(), refreshing: null, jobsStarted: false };
     });
 }
 
 export async function getIndex(): Promise<BuildIndex> {
     const s = services();
     await s.ready;
+    if (Date.now() - s.refreshedAt > INDEX_REFRESH_MS) {
+        s.refreshing ??= s.index.refresh()
+            .catch(e => console.error("[index] refresh failed:", e))
+            .finally(() => {
+                s.refreshedAt = Date.now();
+                s.refreshing = null;
+            });
+        await s.refreshing;
+    }
     return s.index;
-}
-
-export function getTracker(): Tracker | null {
-    return services().tracker;
 }
 
 export async function startBackgroundJobs(): Promise<void> {
     const s = services();
     await s.ready;
-    if (s.tracker || !Config.trackerEnabled) return;
-
-    s.tracker = new Tracker(s.index);
-    s.tracker.start();
+    if (s.jobsStarted) return;
+    s.jobsStarted = true;
 
     const sweep = () => sweepArchives().catch(e => console.error("[archive] sweep failed:", e));
     void sweep();

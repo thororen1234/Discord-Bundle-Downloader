@@ -9,6 +9,8 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
+        "scraper": "tsx src/scraper.ts",
+        "build:scraper": "esbuild src/scraper.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/scraper.mjs",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "lint:types": "next typegen && tsc --noEmit"
@@ -33,6 +35,7 @@
         "@types/node": "^26.6.2",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
+        "esbuild": "^0.28.2",
         "eslint": "^10.11.0",
         "eslint-plugin-simple-import-sort": "^14.0.0",
         "eslint-plugin-unused-imports": "^4.4.1",

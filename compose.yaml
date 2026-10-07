@@ -1,0 +1,21 @@
+services:
+    web:
+        build:
+            context: .
+            target: web
+        ports:
+            - "8484:8484"
+        volumes:
+            - data:/data
+        restart: unless-stopped
+
+    scraper:
+        build:
+            context: .
+            target: scraper
+        volumes:
+            - data:/data
+        restart: unless-stopped
+
+volumes:
+    data:

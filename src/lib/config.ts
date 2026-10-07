@@ -44,7 +44,6 @@ function channelsEnv(): Channel[] {
 
 export const Config = {
     dataDir: path.resolve(process.env.DATA_DIR ?? "."),
-    trackerEnabled: process.env.TRACKER_ENABLED !== "false",
     channels: channelsEnv(),
     pollIntervalMs: intEnv("POLL_INTERVAL_SECONDS", 30) * 1000,
     chunkConcurrency: intEnv("CHUNK_CONCURRENCY", 50),

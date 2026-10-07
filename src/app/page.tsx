@@ -6,9 +6,9 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { BuildCard } from "@/components/BuildCard";
 import { ChannelBadge } from "@/components/ChannelBadge";
 import { Section } from "@/components/Section";
-import { Config } from "@/lib/config";
 import { shortHash, timeAgo } from "@/lib/format";
-import { getIndex, getTracker } from "@/lib/services";
+import { getIndex } from "@/lib/services";
+import { readTrackerStatus } from "@/lib/trackerStatus";
 import { type Channel, channelsOf } from "@/lib/types";
 
 const INITIAL_COUNT = 24;
@@ -44,11 +44,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     const showAll = all === "1";
 
     const index = await getIndex();
-    const tracker = getTracker();
+    const tracker = await readTrackerStatus();
     const builds = index.list(channel).toReversed();
     const visible = showAll ? builds : builds.slice(0, INITIAL_COUNT);
-    const jobs = tracker ? [...tracker.jobs.values()] : [];
-    const failures = tracker ? [...tracker.failures.entries()] : [];
+    const jobs = tracker?.jobs ?? [];
+    const failures = tracker?.failures ?? [];
 
     const latest = new Set<string>();
     const seen = new Set<Channel>();
@@ -67,7 +67,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <Section icon={Activity} title="Tracker">
                 {tracker ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                        {Config.channels.map(c => {
+                        {tracker.channels.map(c => {
                             const status = tracker.status[c];
                             const known = status.buildHash ? index.get(status.buildHash) : undefined;
                             return (
@@ -93,8 +93,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                     </div>
                 ) : (
                     <p className={mutedTextClass}>
-                        The tracker isn&apos;t running{Config.trackerEnabled ? " yet" : " (TRACKER_ENABLED=false)"}.
-                        Stored builds are still served.
+                        The scraper isn&apos;t running. Stored builds are still served.
                     </p>
                 )}
 

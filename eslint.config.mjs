@@ -5,7 +5,7 @@ import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-    { ignores: [".next", "node_modules", "builds", "next-env.d.ts"] },
+    { ignores: [".next", "dist", "node_modules", "builds", "next-env.d.ts"] },
     {
         files: ["**/*.{ts,tsx,mjs}"],
         plugins: {

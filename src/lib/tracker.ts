@@ -3,6 +3,7 @@ import type { BuildIndex } from "./buildIndex";
 import { APP_ORIGINS, Config } from "./config";
 import { scrapeFullBundle, type ScrapeProgress } from "./scraper";
 import { readFullBundle, writeFullBundle } from "./storage";
+import type { TrackerSnapshot } from "./trackerStatus";
 import { type BundleMetadata, type Channel, channelsOf, withChannels } from "./types";
 
 export interface ChannelStatus {
@@ -18,7 +19,7 @@ export interface ScrapeJob {
     progress: ScrapeProgress | null;
 }
 
-interface Failure {
+export interface Failure {
     count: number;
     retryAt: number;
     error: string;
@@ -52,7 +53,16 @@ export class Tracker {
         console.log(`[tracker] watching ${Config.channels.join(", ")} every ${Config.pollIntervalMs / 1000}s`);
         void this.check();
         this.timer = setInterval(() => void this.check(), Config.pollIntervalMs);
-        this.timer.unref();
+    }
+
+    snapshot(): TrackerSnapshot {
+        return {
+            updatedAt: Date.now(),
+            channels: Config.channels,
+            status: this.status,
+            jobs: [...this.jobs.values()],
+            failures: [...this.failures.entries()],
+        };
     }
 
     async check() {
