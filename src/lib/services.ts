@@ -1,6 +1,7 @@
 import { sweepArchives } from "./archive";
 import { BuildIndex } from "./buildIndex";
 import { persistent } from "./global";
+import { sweepModuleStores } from "./moduleStore";
 import { ensureBuildsDir } from "./storage";
 
 interface Services {
@@ -43,7 +44,10 @@ export async function startBackgroundJobs(): Promise<void> {
     if (s.jobsStarted) return;
     s.jobsStarted = true;
 
-    const sweep = () => sweepArchives().catch(e => console.error("[archive] sweep failed:", e));
+    const sweep = () => Promise.all([
+        sweepArchives().catch(e => console.error("[archive] sweep failed:", e)),
+        sweepModuleStores().catch(e => console.error("[modules] sweep failed:", e)),
+    ]);
     void sweep();
     setInterval(sweep, ARCHIVE_SWEEP_INTERVAL_MS).unref();
 }

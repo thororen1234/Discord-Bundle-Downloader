@@ -51,8 +51,8 @@ export async function readMpkZst<T>(file: string): Promise<T> {
     return unpack<T>(await zstdDecompress(await fs.readFile(file)));
 }
 
-async function writeAtomic(file: string, data: Uint8Array): Promise<void> {
-    const tmp = `${file}.tmp`;
+export async function writeAtomic(file: string, data: Uint8Array): Promise<void> {
+    const tmp = `${file}.${process.pid}.tmp`;
     const handle = await fs.open(tmp, "w");
     try {
         await handle.writeFile(data);

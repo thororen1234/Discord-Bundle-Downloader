@@ -6,12 +6,13 @@ import { connection } from "next/server";
 
 import { ChannelBadge } from "@/components/ChannelBadge";
 import { Section } from "@/components/Section";
-import { getFullBundle } from "@/lib/bundleCache";
 import { formatCount } from "@/lib/format";
+import { getModuleStore } from "@/lib/moduleStore";
 import { getOutgoingDeps } from "@/lib/scraper/deps";
 import { getIndex } from "@/lib/services";
 import { channelLabel, channelsOf } from "@/lib/types";
 
+const MAX_SOURCE_CHARS = 250_000;
 const boxClass = "rounded-2xl border border-zinc-300 bg-zinc-100 text-neutral-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300";
 const labelClass = "text-xs font-medium text-neutral-500 dark:text-neutral-400";
 const mutedTextClass = "text-sm text-neutral-500 dark:text-neutral-400";
@@ -31,7 +32,7 @@ function ModuleLinks({ hash, title, ids }: { hash: string; title: string; ids: n
             </span>
             {ids.length ? (
                 <div className="flex max-h-40 flex-wrap gap-x-3 gap-y-1 overflow-y-auto font-mono text-sm">
-                    {ids.toSorted((a, b) => a - b).map(id => <Link key={id} href={`/build/${hash}/module/${id}`}>{id}</Link>)}
+                    {ids.toSorted((a, b) => a - b).map(id => <Link key={id} href={`/build/${hash}/module/${id}`} prefetch={false}>{id}</Link>)}
                 </div>
             ) : <span className={mutedTextClass}>none</span>}
         </div>
@@ -44,15 +45,14 @@ export default async function ModulePage({ params }: PageProps<"/build/[hash]/mo
 
     const meta = (await getIndex()).get(hash);
     if (!meta) notFound();
-    const bundle = await getFullBundle(hash);
-    const code = bundle.modules[id];
+    const store = await getModuleStore(hash);
+    const code = await store.read(id);
     if (code == null) notFound();
 
-    const incoming = bundle.depInfo.moduleDeps[id] ?? { sync: [], lazy: [] };
+    const incoming = store.incomingDeps(id);
     const outgoing = getOutgoingDeps(code) ?? { sync: [], lazy: [] };
-    const chunks = Object.entries(bundle.moduleSources)
-        .filter(([, ids]) => ids.includes(Number(id)))
-        .map(([file]) => file);
+    const chunks = store.chunksOf(id);
+    const truncated = code.length > MAX_SOURCE_CHARS;
     const isEntryPoint = meta.entryPoint === Number(id);
 
     return (
@@ -79,8 +79,8 @@ export default async function ModulePage({ params }: PageProps<"/build/[hash]/mo
                 <div className="grid gap-3 md:grid-cols-2">
                     <ModuleLinks hash={hash} title="Required by" ids={incoming.sync} />
                     <ModuleLinks hash={hash} title="Lazily required by" ids={incoming.lazy} />
-                    <ModuleLinks hash={hash} title="Requires" ids={outgoing.sync.filter(d => d in bundle.modules)} />
-                    <ModuleLinks hash={hash} title="Lazily requires" ids={outgoing.lazy.filter(d => d in bundle.modules)} />
+                    <ModuleLinks hash={hash} title="Requires" ids={outgoing.sync.filter(d => store.has(d))} />
+                    <ModuleLinks hash={hash} title="Lazily requires" ids={outgoing.lazy.filter(d => store.has(d))} />
                 </div>
             </Section>
 
@@ -93,8 +93,13 @@ export default async function ModulePage({ params }: PageProps<"/build/[hash]/mo
                     </a>
                 }
             >
+                {truncated && (
+                    <p className={mutedTextClass}>
+                        Showing the first {formatCount(MAX_SOURCE_CHARS)} characters. <a href={`/build/${hash}/module/${id}/raw`}>Open raw</a> for the full source.
+                    </p>
+                )}
                 <pre className={`max-h-[75vh] overflow-auto px-5 py-4 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all ${boxClass}`}>
-                    {code}
+                    {truncated ? code.slice(0, MAX_SOURCE_CHARS) : code}
                 </pre>
             </Section>
         </>

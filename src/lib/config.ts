@@ -10,14 +10,6 @@ function intEnv(name: string, fallback: number): number {
     return value;
 }
 
-function nonNegativeIntEnv(name: string, fallback: number): number {
-    const raw = process.env[name];
-    if (!raw) return fallback;
-    const value = Number(raw);
-    if (!Number.isInteger(value) || value < 0) throw new Error(`${name} must be a non-negative integer, got "${raw}"`);
-    return value;
-}
-
 function boolEnv(name: string, fallback: boolean): boolean {
     const raw = process.env[name];
     if (raw == null) return fallback;
@@ -47,8 +39,6 @@ export const Config = {
     channels: channelsEnv(),
     pollIntervalMs: intEnv("POLL_INTERVAL_SECONDS", 30) * 1000,
     chunkConcurrency: intEnv("CHUNK_CONCURRENCY", 50),
-    // Decoded bundles are large. Keep this off on small servers unless repeated UI reads need it.
-    bundleCacheSize: nonNegativeIntEnv("BUNDLE_CACHE_SIZE", 0),
     archivePrebuild: boolEnv("ARCHIVE_PREBUILD", false),
     archiveThreads: intEnv("ARCHIVE_THREADS", 1),
     archiveCompressionLevel: intEnv("ARCHIVE_COMPRESSION_LEVEL", 3),

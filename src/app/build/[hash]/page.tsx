@@ -6,8 +6,8 @@ import { connection } from "next/server";
 
 import { ChannelBadge } from "@/components/ChannelBadge";
 import { Section } from "@/components/Section";
-import { getFullBundle } from "@/lib/bundleCache";
 import { formatCount, formatDate, shortHash, timeAgo } from "@/lib/format";
+import { getModuleStore } from "@/lib/moduleStore";
 import { getIndex } from "@/lib/services";
 import { channelLabel, channelsOf } from "@/lib/types";
 
@@ -47,27 +47,14 @@ export default async function BuildPage({ params, searchParams }: PageProps<"/bu
 
     if (typeof jumpId === "string" && jumpId.trim()) redirect(`/build/${hash}/module/${encodeURIComponent(jumpId.trim())}`);
 
-    const bundle = await getFullBundle(hash);
-    const moduleCount = Object.keys(bundle.modules).length;
-    const chunkCount = Object.keys(bundle.moduleSources).length;
+    const store = await getModuleStore(hash);
     const prev = index.before(meta.firstSeen);
     const next = index.after(meta.firstSeen);
 
     const query = typeof rawQuery === "string" ? rawQuery : "";
-    const results: { id: string; before: string; after: string; }[] = [];
-    let totalMatches = 0;
-    if (query) {
-        for (const [id, code] of Object.entries(bundle.modules)) {
-            const at = code.indexOf(query);
-            if (at === -1) continue;
-            if (++totalMatches > MAX_RESULTS) continue;
-            results.push({
-                id,
-                before: code.slice(Math.max(0, at - SNIPPET_RADIUS), at),
-                after: code.slice(at + query.length, at + query.length + SNIPPET_RADIUS),
-            });
-        }
-    }
+    const { total: totalMatches, results } = query
+        ? await store.search(query, MAX_RESULTS, SNIPPET_RADIUS)
+        : { total: 0, results: [] };
 
     return (
         <>
@@ -101,8 +88,8 @@ export default async function BuildPage({ params, searchParams }: PageProps<"/bu
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-                <Stat label="Modules" value={formatCount(moduleCount)} />
-                <Stat label="Chunks" value={formatCount(chunkCount)} />
+                <Stat label="Modules" value={formatCount(store.moduleCount)} />
+                <Stat label="Chunks" value={formatCount(store.chunkCount)} />
                 <Stat label="Entry point" value={meta.entryPoint != null ? String(meta.entryPoint) : "-"} />
             </div>
 
@@ -151,7 +138,7 @@ export default async function BuildPage({ params, searchParams }: PageProps<"/bu
                         <ul className="flex flex-col gap-2">
                             {results.map(r => (
                                 <li key={r.id}>
-                                    <Link href={`/build/${hash}/module/${r.id}`} className={cardClass}>
+                                    <Link href={`/build/${hash}/module/${r.id}`} prefetch={false} className={cardClass}>
                                         <div className="flex items-center gap-2">
                                             <span className="font-semibold text-neutral-800 tabular-nums dark:text-neutral-200">{r.id}</span>
                                             <ArrowRight
@@ -176,7 +163,7 @@ export default async function BuildPage({ params, searchParams }: PageProps<"/bu
                 <details className={boxClass}>
                     <summary className="cursor-pointer px-5 py-3 text-sm font-medium">Show environment</summary>
                     <pre className="overflow-x-auto border-t border-zinc-300 px-5 py-4 font-mono text-xs whitespace-pre-wrap break-all text-neutral-600 dark:border-zinc-800 dark:text-neutral-400">
-                        {bundle.envVarText.trim()}
+                        {store.envVarText.trim()}
                     </pre>
                 </details>
             </Section>
