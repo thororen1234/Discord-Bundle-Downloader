@@ -29,3 +29,7 @@ export function shortHash(hash: string): string {
 export function formatCount(n: number): string {
     return n.toLocaleString("en-US");
 }
+
+export function formatBytes(n: number): string {
+    return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}

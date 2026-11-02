@@ -11,6 +11,8 @@
         "start": "next start",
         "scraper": "tsx src/scraper.ts",
         "build:scraper": "esbuild src/scraper.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/scraper.mjs",
+        "compactor": "tsx src/compactor.ts",
+        "build:compactor": "esbuild src/compactor.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/compactor.mjs",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "lint:types": "next typegen && tsc --noEmit"

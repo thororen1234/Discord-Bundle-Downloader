@@ -3,7 +3,7 @@ import type { Channel, FullBundle } from "../types";
 import { loadLazyChunks } from "./chunks";
 import { computeDepInfo } from "./deps";
 import { parseAppHtml } from "./html";
-import { loadMainChunk } from "./webpack";
+import { findBuildNumber, loadMainChunk } from "./webpack";
 
 export interface ScrapeProgress {
     stage: string;
@@ -74,7 +74,7 @@ export async function scrapeFullBundle({ channel, buildHash, html, onProgress }:
     return {
         metadata: {
             buildHash,
-            buildNumber: mainChunk.buildNumber,
+            buildNumber: mainChunk.buildNumber || findBuildNumber(modules),
             firstSeen,
             entryPoint: mainChunk.entryPoint,
             channels: [channel],

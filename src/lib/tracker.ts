@@ -30,6 +30,12 @@ const MIN_RETRY_MS = 60 * 1000;
 const MAX_RETRY_MS = 60 * MIN_RETRY_MS;
 const CHECK_TIMEOUT_MS = 20 * 1000;
 
+export function nextFailure(previous: Failure | undefined, error: unknown): Failure {
+    const count = (previous?.count ?? 0) + 1;
+    const delay = Math.min(MIN_RETRY_MS * 2 ** (count - 1), MAX_RETRY_MS);
+    return { count, retryAt: Date.now() + delay, error: String(error) };
+}
+
 export class Tracker {
     readonly status = {} as Record<Channel, ChannelStatus>;
     readonly jobs = new Map<string, ScrapeJob>();
@@ -163,15 +169,11 @@ export class Tracker {
     }
 
     private recordFailure(buildHash: string, channel: Channel, error: unknown) {
-        const count = (this.failures.get(buildHash)?.count ?? 0) + 1;
-        const delay = Math.min(
-            MIN_RETRY_MS * 2 ** (count - 1),
-            MAX_RETRY_MS,
-        );
-        this.failures.set(buildHash, { count, retryAt: Date.now() + delay, error: String(error) });
+        const failure = nextFailure(this.failures.get(buildHash), error);
+        this.failures.set(buildHash, failure);
         console.error(
             `[tracker] failed to scrape ${channel} build ${buildHash} ` +
-            `(attempt ${count}), retrying in ${delay / 1000}s:`,
+            `(attempt ${failure.count}), retrying in ${Math.round((failure.retryAt - Date.now()) / 1000)}s:`,
             error,
         );
     }

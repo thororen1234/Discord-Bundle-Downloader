@@ -42,7 +42,7 @@ async function createArchive(buildHash: string, target: string): Promise<void> {
             "a",
             "-t7z",
             `-mx=${Config.archiveCompressionLevel}`,
-            "-md=16m",
+            "-m0=LZMA2:d=16m:c=8m",
             `-mmt=${Config.archiveThreads}`,
             "-bd",
             "-bso0",

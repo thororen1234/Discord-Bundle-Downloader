@@ -19,6 +19,8 @@ jobs:
                       suffix: ""
                     - target: scraper
                       suffix: "-scraper"
+                    - target: compactor
+                      suffix: "-compactor"
         permissions:
             contents: read
             packages: write

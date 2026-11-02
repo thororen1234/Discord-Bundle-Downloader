@@ -17,5 +17,13 @@ services:
             - data:/data
         restart: unless-stopped
 
+    compactor:
+        build:
+            context: .
+            target: compactor
+        volumes:
+            - data:/data
+        restart: unless-stopped
+
 volumes:
     data:

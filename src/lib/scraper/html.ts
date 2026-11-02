@@ -24,7 +24,8 @@ export function parseAppHtml(html: string): ParsedHtml {
     }
 
     if (globalEnvText == null) throw new Error("Could not find the GLOBAL_ENV script in the app HTML");
-    if (webJsFile == null) throw new Error("Could not find the web.js entrypoint in the app HTML");
+    webJsFile ??= initialChunkFiles.shift() ?? null;
+    if (webJsFile == null) throw new Error("Could not find the webpack runtime in the app HTML");
 
     return { globalEnvText, webJsFile, initialChunkFiles };
 }

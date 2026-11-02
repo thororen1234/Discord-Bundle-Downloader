@@ -1,6 +1,7 @@
 import { WebpackLazyChunkParser } from "@vencord-companion/webpack-chunk-parser";
+import vm from "vm";
 
-import { CHUNK_LOAD_RE } from "./webpack";
+import { CHUNK_LOAD_RE, factoryToString } from "./webpack";
 
 export interface LoadedChunks {
     modules: Record<string, string>;
@@ -20,7 +21,21 @@ export interface ChunkLoaderOptions {
 }
 
 const CHUNK_GLOBAL = "webpackChunkdiscord_app";
+const JSONP_GLOBAL = "webpackJsonp";
 const RETRIES = 3;
+
+function parseJsonpChunk(code: string): Record<string, string> {
+    const modules: Record<string, string> = {};
+    const webpackJsonp = {
+        push([, chunkModules]: [unknown, Record<string, unknown>]) {
+            for (const [id, factory] of Object.entries(chunkModules ?? {})) modules[id] = factoryToString(factory);
+        },
+    };
+    const ctx = vm.createContext({ webpackJsonp });
+    ctx.window = ctx;
+    vm.runInContext(code, ctx, { timeout: 30_000 });
+    return modules;
+}
 
 async function fetchText(url: string, userAgent: string): Promise<string | null> {
     for (let attempt = 0; ; attempt++) {
@@ -64,6 +79,12 @@ export async function loadLazyChunks(options: ChunkLoaderOptions): Promise<Loade
         if (code.includes(CHUNK_GLOBAL)) {
             try {
                 modules = new WebpackLazyChunkParser(code).getDefinedModules();
+            } catch (error) {
+                console.warn(`[scraper] failed to parse chunk ${file}:`, error);
+            }
+        } else if (code.includes(JSONP_GLOBAL)) {
+            try {
+                modules = parseJsonpChunk(code);
             } catch (error) {
                 console.warn(`[scraper] failed to parse chunk ${file}:`, error);
             }

@@ -1,6 +1,8 @@
-export type Channel = "stable" | "canary";
+export type Channel = "stable" | "ptb" | "canary";
 
-export const CHANNELS: readonly Channel[] = ["stable", "canary"];
+export const CHANNELS: readonly Channel[] = ["stable", "ptb", "canary"];
+
+export const PAGE_SIZE = 24;
 
 export interface BundleMetadata {
     buildHash: string;

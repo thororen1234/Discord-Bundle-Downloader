@@ -1,3 +1,5 @@
+import { readAndroidBuilds } from "./android/storage";
+import type { AndroidBuild } from "./android/types";
 import { sweepArchives } from "./archive";
 import { BuildIndex } from "./buildIndex";
 import { persistent } from "./global";
@@ -36,6 +38,25 @@ export async function getIndex(): Promise<BuildIndex> {
         await s.refreshing;
     }
     return s.index;
+}
+
+export async function getAndroidBuilds(): Promise<AndroidBuild[]> {
+    const cache = persistent("androidBuilds", () => ({
+        builds: [] as AndroidBuild[],
+        loadedAt: 0,
+        loading: null as Promise<void> | null,
+    }));
+    if (Date.now() - cache.loadedAt > INDEX_REFRESH_MS) {
+        cache.loading ??= readAndroidBuilds()
+            .then(builds => void (cache.builds = builds))
+            .catch(e => console.error("[android] refresh failed:", e))
+            .finally(() => {
+                cache.loadedAt = Date.now();
+                cache.loading = null;
+            });
+        await cache.loading;
+    }
+    return cache.builds;
 }
 
 export async function startBackgroundJobs(): Promise<void> {

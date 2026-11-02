@@ -51,6 +51,7 @@ const TERNARY_CHUNK_RE = /"([^"]+)"===[\w$]+\?/g;
 export const CHUNK_LOAD_RE = /\.e\("?([^")]+?)"?\)/g;
 const BUILD_NUMBER_RE = /build_number:"(\d+)"/;
 const ENV_BUILD_NUMBER_RE = /"BUILD_NUMBER":"(\d+)"/;
+const JSONP_CHUNK_MAP_RE = /\{((?:\d+:"[0-9a-f]+",?)+)\}\[[\w$]+\]\+"\.js"/;
 const ENTRYPOINT_RES = [/=>\s*[\w$]+\((\d+)\)\)/g, /[\w$]+\([\w$]+\.s=(\d+)\)/g];
 
 function fromVencordParser(code: string, globalEnvText: string): MainChunk | null {
@@ -75,7 +76,21 @@ function fromVencordParser(code: string, globalEnvText: string): MainChunk | nul
     };
 }
 
-function factoryToString(factory: unknown): string {
+function fromJsonpRuntime(code: string, globalEnvText: string): MainChunk | null {
+    if (!code.includes("webpackJsonp")) return null;
+    const map = JSONP_CHUNK_MAP_RE.exec(code)?.[1] ?? "";
+    const chunkFiles = new Map([...map.matchAll(/(\d+):"([0-9a-f]+)"/g)].map(([, id, hash]) => [id, `${hash}.js`]));
+
+    return {
+        modules: {},
+        chunkIds: [...chunkFiles.keys()],
+        chunkFile: chunkId => chunkFiles.get(chunkId) ?? null,
+        buildNumber: Number(ENV_BUILD_NUMBER_RE.exec(globalEnvText)?.[1] ?? 0),
+        entryPoint: null,
+    };
+}
+
+export function factoryToString(factory: unknown): string {
     const code = String(factory);
     if (code.startsWith("function") || /^(?:async\s*)?(?:\([^)]*\)|[\w$]+)\s*=>/.test(code)) return code;
     return "function" + code.slice(code.indexOf("("));
@@ -128,5 +143,13 @@ function fromRuntime(code: string, globalEnvText: string, filename: string): Mai
 }
 
 export function loadMainChunk(code: string, globalEnvText: string, filename: string): MainChunk {
-    return fromVencordParser(code, globalEnvText) ?? fromRuntime(code, globalEnvText, filename);
+    return fromVencordParser(code, globalEnvText) ?? fromJsonpRuntime(code, globalEnvText) ?? fromRuntime(code, globalEnvText, filename);
+}
+
+export function findBuildNumber(modules: Record<string, string>): number {
+    for (const source of Object.values(modules)) {
+        const match = BUILD_NUMBER_RE.exec(source);
+        if (match) return Number(match[1]);
+    }
+    return 0;
 }

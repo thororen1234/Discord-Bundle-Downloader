@@ -16,6 +16,9 @@ RUN pnpm build
 FROM build AS build-scraper
 RUN pnpm build:scraper
 
+FROM build AS build-compactor
+RUN pnpm build:compactor
+
 FROM base AS prod-deps
 RUN pnpm install --prod --frozen-lockfile
 
@@ -29,6 +32,11 @@ FROM runtime AS scraper
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build-scraper /app/dist/scraper.mjs ./
 CMD ["node", "scraper.mjs"]
+
+FROM runtime AS compactor
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build-compactor /app/dist/compactor.mjs ./
+CMD ["node", "compactor.mjs"]
 
 FROM runtime AS web
 ENV NEXT_TELEMETRY_DISABLED=1 PORT=8484 HOSTNAME=0.0.0.0

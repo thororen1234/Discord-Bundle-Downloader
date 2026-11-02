@@ -1,31 +1,45 @@
-import { Activity, LoaderCircle, Package, TriangleAlert } from "lucide-react";
+import { Activity, LoaderCircle, Monitor, Package, Smartphone, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { BuildCard } from "@/components/BuildCard";
+import { AndroidBuildGrid, BuildGrid } from "@/components/BuildGrid";
 import { ChannelBadge } from "@/components/ChannelBadge";
 import { Section } from "@/components/Section";
-import { shortHash, timeAgo } from "@/lib/format";
-import { getIndex } from "@/lib/services";
+import { ANDROID_CHANNELS, type AndroidChannel, isAndroidChannel } from "@/lib/android/types";
+import { formatBytes, shortHash, timeAgo } from "@/lib/format";
+import { getAndroidBuilds, getIndex } from "@/lib/services";
 import { readTrackerStatus } from "@/lib/trackerStatus";
-import { type Channel, channelsOf } from "@/lib/types";
+import { type Channel, channelsOf, isChannel, PAGE_SIZE } from "@/lib/types";
 
-const INITIAL_COUNT = 24;
 const boxClass = "rounded-2xl border border-zinc-300 bg-zinc-100 text-neutral-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300";
 const mutedTextClass = "text-sm text-neutral-500 dark:text-neutral-400";
-const outlineButtonClass = "inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-100 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-zinc-300 hover:no-underline active:scale-[.97] dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-200 dark:hover:bg-zinc-800";
+
+type Platform = "desktop" | "mobile";
+
+const PLATFORMS: { label: string; value: Platform; icon: typeof Monitor; }[] = [
+    { label: "Desktop", value: "desktop", icon: Monitor },
+    { label: "Mobile", value: "mobile", icon: Smartphone },
+];
 
 const FILTERS: { label: string; value?: Channel; }[] = [
     { label: "All" },
     { label: "Stable", value: "stable" },
+    { label: "PTB", value: "ptb" },
     { label: "Canary", value: "canary" },
 ];
 
-function filterHref(channel: Channel | undefined, all: boolean) {
+const ANDROID_FILTERS: { label: string; value?: AndroidChannel; }[] = [
+    { label: "All" },
+    { label: "Alpha", value: "alpha" },
+    { label: "Beta", value: "beta" },
+    { label: "Stable", value: "stable" },
+];
+
+function filterHref(platform: Platform, channel: string | undefined) {
     const params = new URLSearchParams();
+    if (platform === "mobile") params.set("platform", platform);
     if (channel) params.set("channel", channel);
-    if (all) params.set("all", "1");
     const query = params.toString();
     return query ? `/?${query}` : "/";
 }
@@ -39,16 +53,30 @@ function tabClass(active: boolean) {
 
 export default async function Home({ searchParams }: PageProps<"/">) {
     await connection();
-    const { channel: rawChannel, all } = await searchParams;
-    const channel = rawChannel === "stable" || rawChannel === "canary" ? rawChannel : undefined;
-    const showAll = all === "1";
+    const { platform: rawPlatform, channel: rawChannel } = await searchParams;
+    const platform: Platform = rawPlatform === "mobile" ? "mobile" : "desktop";
+    const channel = platform === "desktop" && isChannel(rawChannel) ? rawChannel : undefined;
+    const androidChannel = platform === "mobile" && isAndroidChannel(rawChannel) ? rawChannel : undefined;
 
     const index = await getIndex();
     const tracker = await readTrackerStatus();
     const builds = index.list(channel).toReversed();
-    const visible = showAll ? builds : builds.slice(0, INITIAL_COUNT);
     const jobs = tracker?.jobs ?? [];
     const failures = tracker?.failures ?? [];
+    const android = tracker?.android ?? null;
+    const allAndroidBuilds = (await getAndroidBuilds()).toReversed();
+    const androidBuilds = androidChannel ? allAndroidBuilds.filter(b => b.channels.includes(androidChannel)) : allAndroidBuilds;
+    const androidJobs = android?.jobs ?? [];
+
+    const latestAndroid = new Set<number>();
+    const seenAndroid = new Set<AndroidChannel>();
+    for (const build of allAndroidBuilds) {
+        for (const c of build.channels) {
+            if (seenAndroid.has(c)) continue;
+            seenAndroid.add(c);
+            latestAndroid.add(build.versionCode);
+        }
+    }
 
     const latest = new Set<string>();
     const seen = new Set<Channel>();
@@ -62,10 +90,30 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
     return (
         <>
-            <AutoRefresh intervalMs={jobs.length ? 2000 : 30_000} />
+            <AutoRefresh intervalMs={(platform === "desktop" ? jobs.length : androidJobs.length) ? 2000 : 30_000} />
+
+            <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Platform">
+                {PLATFORMS.map(({ label, value, icon: Icon }) => (
+                    <Link
+                        key={value}
+                        href={filterHref(value, undefined)}
+                        aria-current={platform === value ? "page" : undefined}
+                        className={tabClass(platform === value)}
+                    >
+                        <Icon size={16} />
+                        {label}
+                    </Link>
+                ))}
+            </div>
 
             <Section icon={Activity} title="Tracker">
-                {tracker ? (
+                {!tracker && (
+                    <p className={mutedTextClass}>
+                        The scraper isn&apos;t running. Stored builds are still served.
+                    </p>
+                )}
+
+                {platform === "desktop" && tracker && (
                     <div className="grid gap-3 sm:grid-cols-2">
                         {tracker.channels.map(c => {
                             const status = tracker.status[c];
@@ -91,13 +139,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                             );
                         })}
                     </div>
-                ) : (
-                    <p className={mutedTextClass}>
-                        The scraper isn&apos;t running. Stored builds are still served.
-                    </p>
                 )}
 
-                {jobs.map(job => {
+                {platform === "desktop" && jobs.map(job => {
                     const p = job.progress;
                     const pct = p?.chunksTotal ? Math.round((p.chunksDone / p.chunksTotal) * 100) : null;
                     return (
@@ -119,7 +163,66 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                     );
                 })}
 
-                {failures.map(([hash, f]) => (
+                {platform === "mobile" && tracker && !android && (
+                    <p className={mutedTextClass}>
+                        Android tracking is off. Set VENDETTA_API_URL on the scraper to turn it on.
+                    </p>
+                )}
+
+                {platform === "mobile" && android && (
+                    <div className={`flex flex-col gap-1.5 px-5 py-4 ${boxClass}`}>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="flex items-center gap-1.5 text-sm font-medium">
+                                <Smartphone size={16} />
+                                Android
+                            </span>
+                            {ANDROID_CHANNELS.map(c => (
+                                <span key={c} className="flex items-center gap-1.5">
+                                    <ChannelBadge channel={c} />
+                                    <span className="font-mono text-xs text-neutral-500 tabular-nums">{android.latest[c] ?? "-"}</span>
+                                </span>
+                            ))}
+                            <span className="ml-auto text-xs text-neutral-500">
+                                {android.checkedAt ? `checked ${timeAgo(android.checkedAt)}` : "not checked yet"}
+                            </span>
+                        </div>
+                        {android.error && <span className="text-sm text-rose-500">{android.error}</span>}
+                    </div>
+                )}
+
+                {platform === "mobile" && androidJobs.map(job => {
+                    const pct = job.bytesTotal ? Math.round((job.bytesDone / job.bytesTotal) * 100) : null;
+                    return (
+                        <div key={job.versionCode} className={`flex flex-col gap-2 px-5 py-4 ${boxClass}`}>
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                                <LoaderCircle size={16} className="animate-spin text-rose-500" />
+                                <span className="font-medium">Downloading</span>
+                                <ChannelBadge channel={job.channel} />
+                                <span className="font-mono text-xs text-neutral-500">{job.versionCode}</span>
+                                <span className={mutedTextClass}>{job.stage}</span>
+                                {job.bytesTotal ? <span className={`ml-auto tabular-nums ${mutedTextClass}`}>{formatBytes(job.bytesDone)} / {formatBytes(job.bytesTotal)}</span> : null}
+                            </div>
+                            {pct != null && (
+                                <div className="h-2 overflow-hidden rounded-full bg-zinc-300 dark:bg-zinc-800">
+                                    <div className="h-full bg-rose-500 transition-[width]" style={{ width: `${pct}%` }} />
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {platform === "mobile" && android?.failures.map(([versionCode, f]) => (
+                    <div key={versionCode} className={`flex flex-col gap-1 px-5 py-4 ${boxClass}`}>
+                        <div className="flex items-center gap-2 text-sm text-rose-500">
+                            <TriangleAlert size={16} />
+                            <span className="font-mono text-xs">Android {versionCode}</span>
+                            failed {f.count}×, retrying {timeAgo(f.retryAt)}
+                        </div>
+                        <span className="font-mono text-xs break-all text-neutral-500">{f.error}</span>
+                    </div>
+                ))}
+
+                {platform === "desktop" && failures.map(([hash, f]) => (
                     <div key={hash} className={`flex flex-col gap-1 px-5 py-4 ${boxClass}`}>
                         <div className="flex items-center gap-2 text-sm text-rose-500">
                             <TriangleAlert size={16} />
@@ -131,40 +234,53 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 ))}
             </Section>
 
-            <Section icon={Package} title="Builds" badge={<span className="text-neutral-500">({builds.length})</span>}>
-                <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
-                    {FILTERS.map(f => (
-                        <Link
-                            key={f.label}
-                            href={filterHref(f.value, showAll)}
-                            aria-current={channel === f.value ? "page" : undefined}
-                            className={tabClass(channel === f.value)}
-                        >
-                            {f.label}
-                        </Link>
-                    ))}
-                </div>
-
-                {builds.length === 0 ? (
-                    <p className={mutedTextClass}>
-                        No {channel ?? ""} builds yet. The tracker saves one as soon as it sees a build it doesn&apos;t have.
-                    </p>
-                ) : (
-                    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {visible.map(b => (
-                            <li key={b.buildHash}>
-                                <BuildCard build={b} latest={latest.has(b.buildHash)} />
-                            </li>
+            {platform === "desktop" ? (
+                <Section icon={Package} title="Builds" badge={<span className="text-neutral-500">({builds.length})</span>}>
+                    <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
+                        {FILTERS.map(f => (
+                            <Link
+                                key={f.label}
+                                href={filterHref(platform, f.value)}
+                                aria-current={channel === f.value ? "page" : undefined}
+                                className={tabClass(channel === f.value)}
+                            >
+                                {f.label}
+                            </Link>
                         ))}
-                    </ul>
-                )}
+                    </div>
 
-                {!showAll && builds.length > INITIAL_COUNT && (
-                    <Link href={filterHref(channel, true)} className={`self-center ${outlineButtonClass}`}>
-                        Show all {builds.length} builds
-                    </Link>
-                )}
-            </Section>
+                    {builds.length === 0 ? (
+                        <p className={mutedTextClass}>
+                            No {channel ?? ""} builds yet. The tracker saves one as soon as it sees a build it doesn&apos;t have.
+                        </p>
+                    ) : (
+                        <BuildGrid key={channel ?? "all"} initial={builds.slice(0, PAGE_SIZE)} channel={channel} latest={[...latest]} />
+                    )}
+                </Section>
+            ) : (
+                <Section icon={Smartphone} title="Android" badge={<span className="text-neutral-500">({androidBuilds.length})</span>}>
+                    <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
+                        {ANDROID_FILTERS.map(f => (
+                            <Link
+                                key={f.label}
+                                href={filterHref(platform, f.value)}
+                                aria-current={androidChannel === f.value ? "page" : undefined}
+                                className={tabClass(androidChannel === f.value)}
+                            >
+                                {f.label}
+                            </Link>
+                        ))}
+                    </div>
+
+                    {androidBuilds.length === 0 ? (
+                        <p className={mutedTextClass}>
+                            No {androidChannel ?? ""} Android builds yet. The tracker downloads the bundle of every new version VendettaAPI reports.
+                        </p>
+                    ) : (
+                        <AndroidBuildGrid key={androidChannel ?? "all"} initial={androidBuilds.slice(0, PAGE_SIZE)} channel={androidChannel} latest={[...latestAndroid]} />
+                    )}
+                </Section>
+            )}
         </>
     );
 }

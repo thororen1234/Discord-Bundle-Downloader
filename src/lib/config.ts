@@ -18,6 +18,14 @@ function boolEnv(name: string, fallback: boolean): boolean {
     throw new Error(`${name} must be "true" or "false", got "${raw}"`);
 }
 
+function urlEnv(name: string): string | null {
+    const raw = process.env[name];
+    if (!raw) return null;
+    const protocol = URL.parse(raw)?.protocol;
+    if (protocol !== "http:" && protocol !== "https:") throw new Error(`${name} must be an http(s) URL, got "${raw}"`);
+    return raw.replace(/\/+$/, "");
+}
+
 function channelsEnv(): Channel[] {
     const channels = new Set<Channel>();
     for (const raw of (process.env.TRACK_CHANNELS ?? "stable").split(",")) {
@@ -40,14 +48,20 @@ export const Config = {
     pollIntervalMs: intEnv("POLL_INTERVAL_SECONDS", 30) * 1000,
     chunkConcurrency: intEnv("CHUNK_CONCURRENCY", 50),
     archivePrebuild: boolEnv("ARCHIVE_PREBUILD", false),
-    archiveThreads: intEnv("ARCHIVE_THREADS", 1),
+    archiveThreads: intEnv("ARCHIVE_THREADS", 4),
     archiveCompressionLevel: intEnv("ARCHIVE_COMPRESSION_LEVEL", 3),
     sevenZipPath: process.env.SEVEN_ZIP_PATH || null,
     archiveTtlMs: 7 * 24 * 60 * 60 * 1000,
     userAgent: "Discord-Bundle-Downloader/1.0",
+    vendettaApiUrl: urlEnv("VENDETTA_API_URL"),
+    vendettaPollIntervalMs: intEnv("VENDETTA_POLL_INTERVAL_SECONDS", 300) * 1000,
+    vendettaWebhookSecret: process.env.VENDETTA_WEBHOOK_SECRET || null,
+    vendettaWebhookPort: intEnv("VENDETTA_WEBHOOK_PORT", 8485),
+    compactAfterMs: intEnv("COMPACT_AFTER_DAYS", 30) * 24 * 60 * 60 * 1000,
 };
 
 export const APP_ORIGINS: Record<Channel, string> = {
     stable: "https://discord.com",
+    ptb: "https://ptb.discord.com",
     canary: "https://canary.discord.com",
 };

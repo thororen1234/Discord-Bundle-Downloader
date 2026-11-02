@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
+import type { AndroidSnapshot } from "./android/tracker";
 import { Config } from "./config";
 import type { ChannelStatus, Failure, ScrapeJob } from "./tracker";
 import type { Channel } from "./types";
@@ -11,6 +12,7 @@ export interface TrackerSnapshot {
     status: Record<Channel, ChannelStatus>;
     jobs: ScrapeJob[];
     failures: [string, Failure][];
+    android?: AndroidSnapshot | null;
 }
 
 export const STATUS_INTERVAL_MS = 2000;
