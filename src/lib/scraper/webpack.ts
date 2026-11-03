@@ -50,6 +50,7 @@ const GET_CHUNK_IDS = `(() => {
 const TERNARY_CHUNK_RE = /"([^"]+)"===[\w$]+\?/g;
 export const CHUNK_LOAD_RE = /\.e\("?([^")]+?)"?\)/g;
 const BUILD_NUMBER_RE = /build_number:"(\d+)"/;
+const LEGACY_BUILD_NUMBER_RE = /([\w$]+)=parseInt\("(\d+)",10\)[\s\S]{0,500}?client_build_number=\1\b/;
 const ENV_BUILD_NUMBER_RE = /"BUILD_NUMBER":"(\d+)"/;
 const JSONP_CHUNK_MAP_RE = /\{((?:\d+:"[0-9a-f]+",?)+)\}\[[\w$]+\]\+"\.js"/;
 const ENTRYPOINT_RES = [/=>\s*[\w$]+\((\d+)\)\)/g, /[\w$]+\([\w$]+\.s=(\d+)\)/g];
@@ -150,6 +151,8 @@ export function findBuildNumber(modules: Record<string, string>): number {
     for (const source of Object.values(modules)) {
         const match = BUILD_NUMBER_RE.exec(source);
         if (match) return Number(match[1]);
+        const legacy = LEGACY_BUILD_NUMBER_RE.exec(source);
+        if (legacy) return Number(legacy[2]);
     }
     return 0;
 }
