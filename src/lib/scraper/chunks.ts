@@ -24,15 +24,16 @@ const CHUNK_GLOBAL = "webpackChunkdiscord_app";
 const JSONP_GLOBAL = "webpackJsonp";
 const RETRIES = 3;
 
-function parseJsonpChunk(code: string): Record<string, string> {
+function parseChunkInVm(code: string): Record<string, string> {
     const modules: Record<string, string> = {};
-    const webpackJsonp = {
+    const chunkArray = {
         push([, chunkModules]: [unknown, Record<string, unknown>]) {
             for (const [id, factory] of Object.entries(chunkModules ?? {})) modules[id] = factoryToString(factory);
         },
     };
-    const ctx = vm.createContext({ webpackJsonp });
+    const ctx = vm.createContext({ [CHUNK_GLOBAL]: chunkArray, [JSONP_GLOBAL]: chunkArray });
     ctx.window = ctx;
+    ctx.self = ctx;
     vm.runInContext(code, ctx, { timeout: 30_000 });
     return modules;
 }
@@ -82,11 +83,14 @@ export async function loadLazyChunks(options: ChunkLoaderOptions): Promise<Loade
             } catch (error) {
                 console.warn(`[scraper] failed to parse chunk ${file}:`, error);
             }
-        } else if (code.includes(JSONP_GLOBAL)) {
-            try {
-                modules = parseJsonpChunk(code);
-            } catch (error) {
-                console.warn(`[scraper] failed to parse chunk ${file}:`, error);
+        }
+        if (!modules || !Object.keys(modules).length) {
+            if (code.includes(CHUNK_GLOBAL) || code.includes(JSONP_GLOBAL)) {
+                try {
+                    modules = parseChunkInVm(code);
+                } catch (error) {
+                    console.warn(`[scraper] failed to parse chunk ${file}:`, error);
+                }
             }
         }
         if (!modules || !Object.keys(modules).length) {

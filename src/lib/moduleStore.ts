@@ -3,6 +3,7 @@ import path from "path";
 import { promisify } from "util";
 import zlib from "zlib";
 
+import { Config } from "./config";
 import { persistent } from "./global";
 import { pack, unpack } from "./msgpack";
 import { buildPath, buildsRoot, readFullBundle, writeAtomic } from "./storage";
@@ -228,18 +229,36 @@ export function getModuleStore(buildHash: string): Promise<ModuleStore> {
     return store;
 }
 
+async function removeStore(buildHash: string) {
+    stores.delete(buildHash);
+    touchedAt.delete(buildHash);
+    await fs.rm(path.join(buildPath(buildHash), MODULE_INDEX_FILE_NAME), { force: true });
+    await fs.rm(path.join(buildPath(buildHash), MODULE_BLOCKS_FILE_NAME), { force: true });
+}
+
 export async function sweepModuleStores(): Promise<void> {
     const cutoff = Date.now() - TTL_MS;
     const dirs = await fs.readdir(buildsRoot(), { withFileTypes: true });
+    const kept: { buildHash: string; usedAt: number; size: number; }[] = [];
     for (const dir of dirs) {
         if (!dir.isDirectory()) continue;
-        const indexFile = path.join(buildsRoot(), dir.name, MODULE_INDEX_FILE_NAME);
-        const stat = await fs.stat(indexFile).catch(() => null);
-        if (!stat || stat.mtimeMs >= cutoff) continue;
-        stores.delete(dir.name);
-        touchedAt.delete(dir.name);
-        await fs.rm(indexFile, { force: true });
-        await fs.rm(path.join(buildsRoot(), dir.name, MODULE_BLOCKS_FILE_NAME), { force: true });
-        console.log(`[modules] expired store for ${dir.name}`);
+        const stat = await fs.stat(path.join(buildsRoot(), dir.name, MODULE_INDEX_FILE_NAME)).catch(() => null);
+        if (!stat) continue;
+        if (stat.mtimeMs < cutoff) {
+            await removeStore(dir.name);
+            console.log(`[modules] expired store for ${dir.name}`);
+            continue;
+        }
+        const blocks = await fs.stat(path.join(buildsRoot(), dir.name, MODULE_BLOCKS_FILE_NAME)).catch(() => null);
+        kept.push({ buildHash: dir.name, usedAt: stat.mtimeMs, size: stat.size + (blocks?.size ?? 0) });
+    }
+
+    let total = kept.reduce((sum, store) => sum + store.size, 0);
+    for (const store of kept.sort((a, b) => a.usedAt - b.usedAt)) {
+        if (total <= Config.moduleCacheMaxBytes) break;
+        if (stores.has(store.buildHash)) continue;
+        await removeStore(store.buildHash);
+        total -= store.size;
+        console.log(`[modules] evicted store for ${store.buildHash}, cache is over ${Config.moduleCacheMaxBytes / 1024 ** 3} GB`);
     }
 }

@@ -19,11 +19,23 @@ export interface ScrapeOptions {
 }
 
 const MAX_FAILED_RATIO = 0.02;
+const PUSH_CHUNK_RE = /^(?:\/\*[\s\S]*?\*\/\s*)?\((?:this|self|window)\.webpack(?:Chunk\w*|Jsonp)=/;
 
 async function fetchText(url: string): Promise<string> {
     const response = await fetch(url, { headers: { "User-Agent": Config.userAgent } });
     if (!response.ok) throw new Error(`GET ${url} failed: ${response.status} ${response.statusText}`);
     return response.text();
+}
+
+async function findRuntime(assetBase: string, files: string[]): Promise<[file: string, code: string]> {
+    for (const file of new Set([files[0], files.at(-1), ...files])) {
+        if (file == null) continue;
+        const code = await fetchText(assetBase + file);
+        if (PUSH_CHUNK_RE.test(code)) continue;
+        files.splice(files.indexOf(file), 1);
+        return [file, code];
+    }
+    throw new Error("Could not find the webpack runtime in the app HTML");
 }
 
 export async function scrapeFullBundle({ channel, buildHash, html, onProgress }: ScrapeOptions): Promise<FullBundle> {
@@ -33,10 +45,13 @@ export async function scrapeFullBundle({ channel, buildHash, html, onProgress }:
     const firstSeen = Date.now();
 
     progress("Parsing app HTML");
-    const { globalEnvText, webJsFile, initialChunkFiles } = parseAppHtml(html ?? await fetchText(`${origin}/app`));
+    const parsed = parseAppHtml(html ?? await fetchText(`${origin}/app`));
+    const { globalEnvText, initialChunkFiles } = parsed;
 
     progress("Fetching main chunk");
-    const webJs = await fetchText(assetBase + webJsFile);
+    const [webJsFile, webJs] = parsed.webJsFile
+        ? [parsed.webJsFile, await fetchText(assetBase + parsed.webJsFile)]
+        : await findRuntime(assetBase, initialChunkFiles);
 
     progress("Capturing webpack require");
     const mainChunk = loadMainChunk(webJs, globalEnvText, webJsFile);
