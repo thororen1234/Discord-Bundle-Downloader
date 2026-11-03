@@ -5,8 +5,10 @@ import { connection } from "next/server";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { AndroidBuildGrid, BuildGrid } from "@/components/BuildGrid";
 import { ChannelBadge } from "@/components/ChannelBadge";
+import { DatePicker } from "@/components/DatePicker";
 import { Section } from "@/components/Section";
 import { ANDROID_CHANNELS, type AndroidChannel, isAndroidChannel } from "@/lib/android/types";
+import { countByDay, type DateRange, formatDateFilter, inRange, parseDateFilter } from "@/lib/dateFilter";
 import { formatBytes, shortHash, timeAgo } from "@/lib/format";
 import { getAndroidBuilds, getIndex } from "@/lib/services";
 import { readTrackerStatus } from "@/lib/trackerStatus";
@@ -36,10 +38,11 @@ const ANDROID_FILTERS: { label: string; value?: AndroidChannel; }[] = [
     { label: "Stable", value: "stable" },
 ];
 
-function filterHref(platform: Platform, channel: string | undefined) {
+function filterHref(platform: Platform, channel: string | undefined, date?: DateRange | null) {
     const params = new URLSearchParams();
     if (platform === "mobile") params.set("platform", platform);
     if (channel) params.set("channel", channel);
+    if (date) params.set("date", date.value);
     const query = params.toString();
     return query ? `/?${query}` : "/";
 }
@@ -53,19 +56,24 @@ function tabClass(active: boolean) {
 
 export default async function Home({ searchParams }: PageProps<"/">) {
     await connection();
-    const { platform: rawPlatform, channel: rawChannel } = await searchParams;
+    const { platform: rawPlatform, channel: rawChannel, date: rawDate } = await searchParams;
+    const date = parseDateFilter(rawDate);
     const platform: Platform = rawPlatform === "mobile" ? "mobile" : "desktop";
     const channel = platform === "desktop" && isChannel(rawChannel) ? rawChannel : undefined;
     const androidChannel = platform === "mobile" && isAndroidChannel(rawChannel) ? rawChannel : undefined;
 
     const index = await getIndex();
     const tracker = await readTrackerStatus();
-    const builds = index.list(channel).toReversed();
+    const channelBuilds = index.list(channel);
+    const builds = channelBuilds.filter(b => inRange(date, b.firstSeen)).toReversed();
     const jobs = tracker?.jobs ?? [];
     const failures = tracker?.failures ?? [];
     const android = tracker?.android ?? null;
     const allAndroidBuilds = (await getAndroidBuilds()).toReversed();
-    const androidBuilds = androidChannel ? allAndroidBuilds.filter(b => b.channels.includes(androidChannel)) : allAndroidBuilds;
+    const channelAndroidBuilds = androidChannel ? allAndroidBuilds.filter(b => b.channels.includes(androidChannel)) : allAndroidBuilds;
+    const androidBuilds = channelAndroidBuilds.filter(b => inRange(date, b.firstSeen));
+    const dayCounts = countByDay((platform === "desktop" ? channelBuilds : channelAndroidBuilds).map(b => b.firstSeen));
+    const dateLabel = date ? ` from ${formatDateFilter(date)}` : "";
     const androidJobs = android?.jobs ?? [];
 
     const latestAndroid = new Set<number>();
@@ -236,48 +244,70 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
             {platform === "desktop" ? (
                 <Section icon={Package} title="Builds" badge={<span className="text-neutral-500">({builds.length})</span>}>
-                    <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
-                        {FILTERS.map(f => (
-                            <Link
-                                key={f.label}
-                                href={filterHref(platform, f.value)}
-                                aria-current={channel === f.value ? "page" : undefined}
-                                className={tabClass(channel === f.value)}
-                            >
-                                {f.label}
-                            </Link>
-                        ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
+                            {FILTERS.map(f => (
+                                <Link
+                                    key={f.label}
+                                    href={filterHref(platform, f.value, date)}
+                                    aria-current={channel === f.value ? "page" : undefined}
+                                    className={tabClass(channel === f.value)}
+                                >
+                                    {f.label}
+                                </Link>
+                            ))}
+                        </div>
+                        <DatePicker value={date?.value ?? null} counts={dayCounts} />
                     </div>
 
                     {builds.length === 0 ? (
                         <p className={mutedTextClass}>
-                            No {channel ?? ""} builds yet. The tracker saves one as soon as it sees a build it doesn&apos;t have.
+                            {date
+                                ? `No ${channel ?? ""} builds${dateLabel}.`
+                                : <>No {channel ?? ""} builds yet. The tracker saves one as soon as it sees a build it doesn&apos;t have.</>}
                         </p>
                     ) : (
-                        <BuildGrid key={channel ?? "all"} initial={builds.slice(0, PAGE_SIZE)} channel={channel} latest={[...latest]} />
+                        <BuildGrid
+                            key={`${channel ?? "all"}-${date?.value ?? "any"}`}
+                            initial={builds.slice(0, PAGE_SIZE)}
+                            channel={channel}
+                            date={date?.value}
+                            latest={[...latest]}
+                        />
                     )}
                 </Section>
             ) : (
                 <Section icon={Smartphone} title="Android" badge={<span className="text-neutral-500">({androidBuilds.length})</span>}>
-                    <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
-                        {ANDROID_FILTERS.map(f => (
-                            <Link
-                                key={f.label}
-                                href={filterHref(platform, f.value)}
-                                aria-current={androidChannel === f.value ? "page" : undefined}
-                                className={tabClass(androidChannel === f.value)}
-                            >
-                                {f.label}
-                            </Link>
-                        ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex w-fit rounded-xl bg-zinc-200 p-1 dark:bg-zinc-800" role="group" aria-label="Release channel">
+                            {ANDROID_FILTERS.map(f => (
+                                <Link
+                                    key={f.label}
+                                    href={filterHref(platform, f.value, date)}
+                                    aria-current={androidChannel === f.value ? "page" : undefined}
+                                    className={tabClass(androidChannel === f.value)}
+                                >
+                                    {f.label}
+                                </Link>
+                            ))}
+                        </div>
+                        <DatePicker value={date?.value ?? null} counts={dayCounts} />
                     </div>
 
                     {androidBuilds.length === 0 ? (
                         <p className={mutedTextClass}>
-                            No {androidChannel ?? ""} Android builds yet. The tracker downloads the bundle of every new version VendettaAPI reports.
+                            {date
+                                ? `No ${androidChannel ?? ""} Android builds${dateLabel}.`
+                                : `No ${androidChannel ?? ""} Android builds yet. The tracker downloads the bundle of every new version VendettaAPI reports.`}
                         </p>
                     ) : (
-                        <AndroidBuildGrid key={androidChannel ?? "all"} initial={androidBuilds.slice(0, PAGE_SIZE)} channel={androidChannel} latest={[...latestAndroid]} />
+                        <AndroidBuildGrid
+                            key={`${androidChannel ?? "all"}-${date?.value ?? "any"}`}
+                            initial={androidBuilds.slice(0, PAGE_SIZE)}
+                            channel={androidChannel}
+                            date={date?.value}
+                            latest={[...latestAndroid]}
+                        />
                     )}
                 </Section>
             )}

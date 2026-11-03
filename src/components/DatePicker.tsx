@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { type DateMode, formatDateFilter, parseDateFilter } from "@/lib/dateFilter";
@@ -33,11 +33,10 @@ function cellClass(selected: boolean, enabled: boolean) {
 
 const navClass = "cursor-pointer rounded-lg p-1 text-neutral-500 transition-colors hover:bg-zinc-200 hover:text-neutral-900 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-zinc-800 dark:hover:text-neutral-100";
 
-export function DatePicker({ counts }: { counts: Record<string, number>; }) {
+export function DatePicker({ value, counts }: { value: string | null; counts: Record<string, number>; }) {
     const router = useRouter();
     const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const selected = parseDateFilter(searchParams.get("date"));
+    const selected = parseDateFilter(value);
 
     const totals = useMemo(() => {
         const sums: Record<string, number> = {};
@@ -76,7 +75,7 @@ export function DatePicker({ counts }: { counts: Record<string, number>; }) {
     }, [open]);
 
     const navigate = (value: string | null) => {
-        const params = new URLSearchParams(searchParams);
+        const params = new URLSearchParams(window.location.search);
         if (value) params.set("date", value);
         else params.delete("date");
         const query = params.toString();

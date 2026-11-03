@@ -14,8 +14,8 @@ import { useChunkedList } from "./useChunkedList";
 const buildKey = (b: BundleMetadata) => b.buildHash;
 const androidKey = (b: AndroidBuild) => b.versionCode;
 
-export function BuildGrid({ initial, channel, latest }: { initial: BundleMetadata[]; channel?: string; latest: string[]; }) {
-    const list = useChunkedList(initial, buildKey, last => loadBuilds(channel, last.firstSeen));
+export function BuildGrid({ initial, channel, date, latest }: { initial: BundleMetadata[]; channel?: string; date?: string; latest: string[]; }) {
+    const list = useChunkedList(initial, buildKey, last => loadBuilds(channel, last.firstSeen, date));
     return (
         <Grid {...list}>
             {list.items.map(b => (
@@ -27,8 +27,8 @@ export function BuildGrid({ initial, channel, latest }: { initial: BundleMetadat
     );
 }
 
-export function AndroidBuildGrid({ initial, channel, latest }: { initial: AndroidBuild[]; channel?: string; latest: number[]; }) {
-    const list = useChunkedList(initial, androidKey, last => loadAndroidBuilds(channel, last.versionCode));
+export function AndroidBuildGrid({ initial, channel, date, latest }: { initial: AndroidBuild[]; channel?: string; date?: string; latest: number[]; }) {
+    const list = useChunkedList(initial, androidKey, last => loadAndroidBuilds(channel, last.versionCode, date));
     return (
         <Grid {...list}>
             {list.items.map(b => (
