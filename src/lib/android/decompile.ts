@@ -30,8 +30,13 @@ const MEMBER_RE = /(?<=(?:^|[^\w$])[A-Za-z_$][\w$]*|[\])])\.([^\s;,()[\]'".]+)/g
 const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*$/;
 const REGEX_LINE_RE = /^\s*r\d+ = \/.*\/[a-z]*;$/;
 
+// older bytecode also has `delete r5.;` for an empty property name
+const EMPTY_MEMBER_RE = /(?<=(?:^|[^\w$])[A-Za-z_$][\w$]*)\.(?=[;,)])/g;
+
 function fixMembers(code: string) {
-    return code.replace(MEMBER_RE, (whole, name: string) => IDENTIFIER_RE.test(name) ? whole : `[${JSON.stringify(name)}]`);
+    return code
+        .replace(MEMBER_RE, (whole, name: string) => IDENTIFIER_RE.test(name) ? whole : `[${JSON.stringify(name)}]`)
+        .replace(EMPTY_MEMBER_RE, "[\"\"]");
 }
 
 export function fixLine(line: string) {
