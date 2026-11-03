@@ -63,7 +63,7 @@ export async function writeAtomic(file: string, data: Uint8Array): Promise<void>
     await fs.rename(tmp, file);
 }
 
-async function writeMpkZst(file: string, value: unknown, level: number): Promise<void> {
+export async function writeMpkZst(file: string, value: unknown, level: number): Promise<void> {
     const compressed = await zstdCompress(pack(value), {
         params: { [zlib.constants.ZSTD_c_compressionLevel]: level },
     });

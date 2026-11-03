@@ -15,6 +15,8 @@ export interface AndroidBuild extends AndroidRelease {
     bundleSize: number;
     bundleSha256: string;
     hermesVersion: number | null;
+    /** Module count once the bundle has been decompiled for the explorer. */
+    modules?: number;
 }
 
 export function isAndroidChannel(value: unknown): value is AndroidChannel {

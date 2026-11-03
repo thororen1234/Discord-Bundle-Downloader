@@ -29,6 +29,9 @@ ENV NODE_ENV=production DATA_DIR=/data SEVEN_ZIP_PATH=/usr/bin/7zz
 VOLUME /data
 
 FROM runtime AS scraper
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv && rm -rf /var/lib/apt/lists/* \
+    && python3 -m venv /opt/hermes-dec && /opt/hermes-dec/bin/pip install --no-cache-dir hermes-dec==0.1.8
+ENV HERMES_DECOMPILER_PATH=/opt/hermes-dec/bin/hbc-decompiler
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build-scraper /app/dist/scraper.mjs ./
 CMD ["node", "scraper.mjs"]

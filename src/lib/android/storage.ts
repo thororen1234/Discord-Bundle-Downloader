@@ -4,13 +4,17 @@ import { promisify } from "util";
 import zlib from "zlib";
 
 import { Config } from "../config";
-import { writeAtomic } from "../storage";
+import { idKeyed, wireMeta } from "../msgpack";
+import { writeAtomic, writeMpkZst } from "../storage";
+import type { DecompiledBundle } from "./decompile";
 import type { AndroidBuild } from "./types";
 
 export const ANDROID_META_FILE_NAME = "meta.json";
 export const ANDROID_BUNDLE_FILE_NAME = "index.android.bundle.zst";
+export const ANDROID_DATA_FILE_NAME = "data.mpk.zst";
 
 const BUNDLE_ZSTD_LEVEL = 10;
+const DATA_ZSTD_LEVEL = 10;
 
 const zstdCompress = promisify(zlib.zstdCompress);
 
@@ -20,6 +24,16 @@ export function androidRoot(): string {
 
 export function androidBuildPath(versionCode: number): string {
     return path.join(androidRoot(), String(versionCode));
+}
+
+// The explorer loads builds by id, Android ones use android-{versionCode}
+export function androidBuildId(versionCode: number): string {
+    return `android-${versionCode}`;
+}
+
+export function parseAndroidBuildId(id: string): number | null {
+    const match = /^android-([1-9]\d{0,9})$/.exec(id);
+    return match ? Number(match[1]) : null;
 }
 
 export function isValidVersionCode(raw: string): boolean {
@@ -53,4 +67,22 @@ export async function writeAndroidBuild(build: AndroidBuild, bundle: Buffer): Pr
     });
     await writeAtomic(path.join(dir, ANDROID_BUNDLE_FILE_NAME), compressed);
     await writeAndroidMeta(build);
+}
+
+export async function writeAndroidData(build: AndroidBuild, { modules, depInfo }: DecompiledBundle): Promise<void> {
+    await writeMpkZst(path.join(androidBuildPath(build.versionCode), ANDROID_DATA_FILE_NAME), {
+        metadata: wireMeta({
+            buildHash: androidBuildId(build.versionCode),
+            buildNumber: build.versionCode,
+            firstSeen: build.firstSeen,
+            entryPoint: null,
+        }),
+        depInfo: {
+            keyModules: depInfo.keyModules,
+            moduleDeps: idKeyed(depInfo.moduleDeps),
+        },
+        moduleSources: {},
+        modules: idKeyed(modules),
+        envVarText: "",
+    }, DATA_ZSTD_LEVEL);
 }
