@@ -12,9 +12,11 @@ import type { AndroidBuild } from "./types";
 export const ANDROID_META_FILE_NAME = "meta.json";
 export const ANDROID_BUNDLE_FILE_NAME = "index.android.bundle.zst";
 export const ANDROID_DATA_FILE_NAME = "data.mpk.zst";
+export const ANDROID_SOURCES_FILE_NAME = "sources.zst";
 
 const BUNDLE_ZSTD_LEVEL = 10;
 const DATA_ZSTD_LEVEL = 10;
+const SOURCES_ZSTD_LEVEL = 19;
 
 const zstdCompress = promisify(zlib.zstdCompress);
 
@@ -85,4 +87,20 @@ export async function writeAndroidData(build: AndroidBuild, { modules, depInfo }
         modules: idKeyed(modules),
         envVarText: "",
     }, DATA_ZSTD_LEVEL);
+}
+
+// One JSON line of [path, start, end] string offsets into the rest of the file, then every source file concatenated
+export async function writeAndroidSources(versionCode: number, files: [path: string, source: string][]): Promise<void> {
+    const index: [string, number, number][] = [];
+    let offset = 0;
+    for (const [file, source] of files) {
+        index.push([file, offset, offset + source.length]);
+        offset += source.length;
+    }
+    const text = JSON.stringify(index) + "\n" + files.map(([, source]) => source).join("");
+    const compressed = await zstdCompress(Buffer.from(text), {
+        params: { [zlib.constants.ZSTD_c_compressionLevel]: SOURCES_ZSTD_LEVEL },
+    });
+    await fs.mkdir(androidBuildPath(versionCode), { recursive: true });
+    await writeAtomic(path.join(androidBuildPath(versionCode), ANDROID_SOURCES_FILE_NAME), compressed);
 }

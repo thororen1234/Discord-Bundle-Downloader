@@ -8,8 +8,8 @@ import { ChannelBadge, LatestBadge } from "./ChannelBadge";
 export function AndroidBuildCard({ build, latest }: { build: AndroidBuild; latest: boolean; }) {
     return (
         <a
-            href={`/android/${build.versionCode}/bundle`}
-            download
+            href={`/android/${build.versionCode}/${build.sources ? "sources" : "bundle"}`}
+            download={build.sources ? `discord-android-${build.versionCode}-sources.txt` : true}
             className="group flex h-full flex-col gap-1.5 rounded-2xl border border-zinc-300 bg-zinc-100 px-5 py-4 text-neutral-800 transition-colors hover:border-zinc-400 hover:no-underline dark:border-zinc-800 dark:bg-zinc-900 dark:text-neutral-300 dark:hover:border-zinc-700"
         >
             <div className="flex items-center gap-2">

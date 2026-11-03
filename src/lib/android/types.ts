@@ -17,6 +17,8 @@ export interface AndroidBuild extends AndroidRelease {
     hermesVersion: number | null;
     /** Module count once the bundle has been decompiled for the explorer. */
     modules?: number;
+    /** Java file count for pre React Native (Kotlin) builds, which are decompiled with jadx instead. */
+    sources?: number;
 }
 
 export function isAndroidChannel(value: unknown): value is AndroidChannel {

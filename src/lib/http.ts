@@ -25,6 +25,14 @@ export function attachment(name: string): Record<string, string> {
     return { "Content-Disposition": `attachment; filename="${name}"` };
 }
 
+export function acceptsZstd(request: Request): boolean {
+    return (request.headers.get("accept-encoding") ?? "").split(",").some(part => {
+        const [coding, ...params] = part.trim().toLowerCase().split(";");
+        const q = params.map(p => p.trim()).find(p => p.startsWith("q="));
+        return coding.trim() === "zstd" && (q == null || Number(q.slice(2)) > 0);
+    });
+}
+
 export async function fileResponse(file: string, contentType: string, name?: string): Promise<Response> {
     const { size } = await fs.stat(file);
     const headers: Record<string, string> = {

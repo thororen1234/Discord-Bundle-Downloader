@@ -5,17 +5,9 @@ import { pipeline, Readable } from "stream";
 import zlib from "zlib";
 
 import { ANDROID_BUNDLE_FILE_NAME, androidBuildPath, isValidVersionCode } from "@/lib/android/storage";
-import { attachment, textResponse } from "@/lib/http";
+import { acceptsZstd, attachment, textResponse } from "@/lib/http";
 import { getAndroidBuilds } from "@/lib/services";
 import { exists } from "@/lib/storage";
-
-function acceptsZstd(request: Request): boolean {
-    return (request.headers.get("accept-encoding") ?? "").split(",").some(part => {
-        const [coding, ...params] = part.trim().toLowerCase().split(";");
-        const q = params.map(p => p.trim()).find(p => p.startsWith("q="));
-        return coding.trim() === "zstd" && (q == null || Number(q.slice(2)) > 0);
-    });
-}
 
 export async function GET(request: Request, { params }: RouteContext<"/android/[versionCode]/bundle">) {
     const { versionCode } = await params;
