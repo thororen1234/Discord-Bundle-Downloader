@@ -26,11 +26,10 @@ const RETRIES = 3;
 
 function parseChunkInVm(code: string): Record<string, string> {
     const modules: Record<string, string> = {};
-    const chunkArray = {
-        push([, chunkModules]: [unknown, Record<string, unknown>]) {
-            for (const [id, factory] of Object.entries(chunkModules ?? {})) modules[id] = factoryToString(factory);
-        },
+    const collect = (_: unknown, chunkModules: Record<string, unknown>) => {
+        for (const [id, factory] of Object.entries(chunkModules ?? {})) modules[id] = factoryToString(factory);
     };
+    const chunkArray = Object.assign(collect, { push: ([ids, chunkModules]: [unknown, Record<string, unknown>]) => collect(ids, chunkModules) });
     const ctx = vm.createContext({ [CHUNK_GLOBAL]: chunkArray, [JSONP_GLOBAL]: chunkArray });
     ctx.window = ctx;
     ctx.self = ctx;
