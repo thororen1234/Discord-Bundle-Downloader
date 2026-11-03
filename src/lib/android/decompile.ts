@@ -22,6 +22,52 @@ const FACTORY_RE = /^ {4}(r\d+) = function\(a0, a1, a2, a3, a4, a5, a6\) \{(?: \
 const FACTORY_END = "    };";
 const DEFINE_RE = /^ {4}r\d+ = r\d+\.bind\(r\d+\)\((r\d+), (r\d+), (r\d+)\);$/;
 
+// hermes-dec output that isn't valid JS, which the explorer can't format:
+// `r3 = /* fn#82749 already emitted */;` (or `recursive`) for a closure printed
+// elsewhere, and `r2.rI1/3H` for property names that aren't identifiers
+const EMITTED_RE = /\/\* fn#(\d+) [\w ]+ \*\//g;
+const MEMBER_RE = /(?<=(?:^|[^\w$])[A-Za-z_$][\w$]*|[\])])\.([^\s;,()[\]'".]+)/g;
+const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*$/;
+const REGEX_LINE_RE = /^\s*r\d+ = \/.*\/[a-z]*;$/;
+
+function fixMembers(code: string) {
+    return code.replace(MEMBER_RE, (whole, name: string) => IDENTIFIER_RE.test(name) ? whole : `[${JSON.stringify(name)}]`);
+}
+
+export function fixLine(line: string) {
+    line = line.replace(EMITTED_RE, "_fun$1");
+    if (REGEX_LINE_RE.test(line)) return line;
+
+    // only touch code outside string literals
+    let out = "";
+    let start = 0;
+    for (let i = 0; i < line.length; i++) {
+        const quote = line[i];
+        if (quote !== "'" && quote !== "\"") continue;
+        out += fixMembers(line.slice(start, i));
+        let end = i + 1;
+        while (end < line.length && line[end] !== quote) end += line[end] === "\\" ? 2 : 1;
+        out += line.slice(i, end + 1);
+        start = i = end + 1;
+        i--;
+    }
+    return out + fixMembers(line.slice(start));
+}
+
+// hermes-dec prints for-in loops as `for(r3 in r4)` followed by a block of
+// `case` labels, which can't sit inside a block. Keep the loop as a comment and
+// flatten the block into the surrounding switch.
+const FOR_IN_RE = /^( *)for\((\w+) in (\w+)\)\n((?:case \d+:\n)*)\1\{\n([\s\S]*?)\n\1\}$/gm;
+
+export function fixForIn(source: string) {
+    // repeat for nested loops
+    for (let prev = ""; prev !== source;) {
+        prev = source;
+        source = source.replace(FOR_IN_RE, "$1// for($2 in $3)\n$4$5");
+    }
+    return source;
+}
+
 export interface DecompiledBundle {
     modules: Record<string, string>;
     depInfo: DepInfo;
@@ -58,10 +104,10 @@ export async function splitModules(decompiledFile: string): Promise<DecompiledBu
         if (factory) {
             if (line === FACTORY_END) {
                 factory.lines.push("}");
-                pending = { reg: factory.reg, source: factory.lines.join("\n") };
+                pending = { reg: factory.reg, source: fixForIn(factory.lines.join("\n")) };
                 factory = null;
             } else {
-                factory.lines.push(line.startsWith("    ") ? line.slice(4) : line);
+                factory.lines.push(fixLine(line.startsWith("    ") ? line.slice(4) : line));
             }
             continue;
         }
