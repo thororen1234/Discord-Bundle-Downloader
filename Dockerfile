@@ -25,7 +25,7 @@ RUN pnpm install --prod --frozen-lockfile
 FROM node:lts-slim AS runtime
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends 7zip && rm -rf /var/lib/apt/lists/*
-ENV NODE_ENV=production DATA_DIR=/data SEVEN_ZIP_PATH=/usr/bin/7zz
+ENV NODE_ENV=production DATA_DIR=/data SEVEN_ZIP_PATH=/usr/bin/7z
 VOLUME /data
 
 FROM runtime AS scraper
