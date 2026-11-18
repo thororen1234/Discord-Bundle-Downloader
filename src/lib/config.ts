@@ -60,6 +60,7 @@ export const Config = {
     vendettaWebhookPort: intEnv("VENDETTA_WEBHOOK_PORT", 8485),
     hermesDecompilerPath: process.env.HERMES_DECOMPILER_PATH || "hbc-decompiler",
     compactAfterMs: intEnv("COMPACT_AFTER_DAYS", 30) * 24 * 60 * 60 * 1000,
+    keepLatestBuilds: intEnv("KEEP_LATEST_BUILDS", Infinity),
 };
 
 export const APP_ORIGINS: Record<Channel, string> = {
