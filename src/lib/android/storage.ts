@@ -4,21 +4,24 @@ import { promisify } from "util";
 import zlib from "zlib";
 
 import { Config } from "../config";
-import { idKeyed, wireMeta } from "../msgpack";
-import { writeAtomic, writeMpkZst } from "../storage";
+import { readDelta, writeDelta } from "../delta";
+import { idKeyed, pack, wireMeta } from "../msgpack";
+import { exists, writeAtomic } from "../storage";
 import type { DecompiledBundle } from "./decompile";
 import type { AndroidBuild } from "./types";
 
 export const ANDROID_META_FILE_NAME = "meta.json";
 export const ANDROID_BUNDLE_FILE_NAME = "index.android.bundle.zst";
 export const ANDROID_DATA_FILE_NAME = "data.mpk.zst";
+export const ANDROID_PATCH_FILE_NAME = "data.patch";
 export const ANDROID_SOURCES_FILE_NAME = "sources.zst";
 
 const BUNDLE_ZSTD_LEVEL = 10;
-const DATA_ZSTD_LEVEL = 10;
+const DELTA_MAX_RATIO = 20;
 const SOURCES_ZSTD_LEVEL = 19;
 
 const zstdCompress = promisify(zlib.zstdCompress);
+const zstdDecompress = promisify(zlib.zstdDecompress);
 
 export function androidRoot(): string {
     return path.join(Config.dataDir, "android");
@@ -71,8 +74,25 @@ export async function writeAndroidBuild(build: AndroidBuild, bundle: Buffer): Pr
     await writeAndroidMeta(build);
 }
 
+export async function hasAndroidData(versionCode: number): Promise<boolean> {
+    const dir = androidBuildPath(versionCode);
+    return await exists(path.join(dir, ANDROID_PATCH_FILE_NAME)) || exists(path.join(dir, ANDROID_DATA_FILE_NAME));
+}
+
+export async function readAndroidDataRaw(versionCode: number): Promise<Buffer> {
+    const dir = androidBuildPath(versionCode);
+    if (await exists(path.join(dir, ANDROID_PATCH_FILE_NAME))) return readDelta(path.join(dir, ANDROID_PATCH_FILE_NAME));
+    return zstdDecompress(await fs.readFile(path.join(dir, ANDROID_DATA_FILE_NAME)));
+}
+
+export async function writeAndroidDataRaw(versionCode: number, raw: Uint8Array): Promise<void> {
+    const dir = androidBuildPath(versionCode);
+    await writeDelta(path.join(dir, ANDROID_PATCH_FILE_NAME), raw, { kind: "android", key: versionCode, id: String(versionCode), maxRatio: DELTA_MAX_RATIO });
+    await fs.rm(path.join(dir, ANDROID_DATA_FILE_NAME), { force: true });
+}
+
 export async function writeAndroidData(build: AndroidBuild, { modules, depInfo }: DecompiledBundle): Promise<void> {
-    await writeMpkZst(path.join(androidBuildPath(build.versionCode), ANDROID_DATA_FILE_NAME), {
+    await writeAndroidDataRaw(build.versionCode, pack({
         metadata: wireMeta({
             buildHash: androidBuildId(build.versionCode),
             buildNumber: build.versionCode,
@@ -86,7 +106,7 @@ export async function writeAndroidData(build: AndroidBuild, { modules, depInfo }
         moduleSources: {},
         modules: idKeyed(modules),
         envVarText: "",
-    }, DATA_ZSTD_LEVEL);
+    }));
 }
 
 // One JSON line of [path, start, end] string offsets into the rest of the file, then every source file concatenated

@@ -44,6 +44,15 @@ export async function fileResponse(file: string, contentType: string, name?: str
     return new Response(body, { headers });
 }
 
+export function bufferResponse(data: Uint8Array<ArrayBuffer>, contentType: string, name?: string): Response {
+    const headers: Record<string, string> = {
+        "Content-Type": contentType,
+        "Content-Length": String(data.length),
+    };
+    if (name) Object.assign(headers, attachment(name));
+    return new Response(data, { headers });
+}
+
 export function channelParam(request: Request, fallback?: Channel): Channel | undefined | null {
     const value = new URL(request.url).searchParams.get("channel");
     if (value == null || value === "") return fallback;

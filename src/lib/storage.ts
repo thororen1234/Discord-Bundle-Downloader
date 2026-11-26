@@ -4,16 +4,18 @@ import { promisify } from "util";
 import zlib from "zlib";
 
 import { Config } from "./config";
+import { readDelta, writeDelta } from "./delta";
 import { idKeyed, pack, unpack, wireMeta } from "./msgpack";
 import type { BundleMetadata, FullBundle } from "./types";
 
 export const DATA_FILE_NAME = "data.mpk.zst";
+export const PATCH_FILE_NAME = "data.patch";
 export const METADATA_FILE_NAME = "meta.mpk.zst";
 export const ARCHIVE_FILE_NAME = "archive.7z";
 
-const FORMAT_VERSION = "5";
+const FORMAT_VERSION = "6";
 const METADATA_ZSTD_LEVEL = 0;
-const DATA_ZSTD_LEVEL = 10;
+const DELTA_MAX_RATIO = 160;
 
 const zstdCompress = promisify(zlib.zstdCompress);
 const zstdDecompress = promisify(zlib.zstdDecompress);
@@ -38,7 +40,7 @@ export async function ensureBuildsDir(): Promise<void> {
     await fs.mkdir(buildsRoot(), { recursive: true });
     const verPath = path.join(buildsRoot(), ".ver");
     const version = await fs.readFile(verPath, "utf8").then(v => v.trim(), () => null);
-    if (version == null) {
+    if (version == null || version === "5") {
         await fs.writeFile(verPath, FORMAT_VERSION);
     } else if (version !== FORMAT_VERSION) {
         throw new Error(
@@ -78,8 +80,19 @@ export function readMetadata(buildHash: string): Promise<BundleMetadata> {
     return readMpkZst(path.join(buildPath(buildHash), METADATA_FILE_NAME));
 }
 
-export function readFullBundle(buildHash: string): Promise<FullBundle> {
-    return readMpkZst(path.join(buildPath(buildHash), DATA_FILE_NAME));
+export async function hasBundle(buildHash: string): Promise<boolean> {
+    const dir = buildPath(buildHash);
+    return await exists(path.join(dir, PATCH_FILE_NAME)) || exists(path.join(dir, DATA_FILE_NAME));
+}
+
+export async function readBundleRaw(buildHash: string): Promise<Buffer> {
+    const dir = buildPath(buildHash);
+    if (await exists(path.join(dir, PATCH_FILE_NAME))) return readDelta(path.join(dir, PATCH_FILE_NAME));
+    return zstdDecompress(await fs.readFile(path.join(dir, DATA_FILE_NAME)));
+}
+
+export async function readFullBundle(buildHash: string): Promise<FullBundle> {
+    return unpack<FullBundle>(await readBundleRaw(buildHash));
 }
 
 export async function writeMetadata(meta: BundleMetadata): Promise<void> {
@@ -88,10 +101,15 @@ export async function writeMetadata(meta: BundleMetadata): Promise<void> {
     await writeMpkZst(path.join(dir, METADATA_FILE_NAME), wireMeta(meta), METADATA_ZSTD_LEVEL);
 }
 
-export async function writeFullBundle(bundle: FullBundle): Promise<void> {
-    const dir = buildPath(bundle.metadata.buildHash);
+export async function writeBundleRaw(meta: BundleMetadata, raw: Uint8Array): Promise<void> {
+    const dir = buildPath(meta.buildHash);
     await fs.mkdir(dir, { recursive: true });
-    await writeMpkZst(path.join(dir, DATA_FILE_NAME), {
+    await writeDelta(path.join(dir, PATCH_FILE_NAME), raw, { kind: "web", key: meta.firstSeen, id: meta.buildHash, maxRatio: DELTA_MAX_RATIO });
+    await fs.rm(path.join(dir, DATA_FILE_NAME), { force: true });
+}
+
+export async function writeFullBundle(bundle: FullBundle): Promise<void> {
+    await writeBundleRaw(bundle.metadata, pack({
         metadata: wireMeta(bundle.metadata),
         depInfo: {
             keyModules: bundle.depInfo.keyModules,
@@ -100,6 +118,6 @@ export async function writeFullBundle(bundle: FullBundle): Promise<void> {
         moduleSources: bundle.moduleSources,
         modules: idKeyed(bundle.modules),
         envVarText: bundle.envVarText,
-    }, DATA_ZSTD_LEVEL);
+    }));
     await writeMetadata(bundle.metadata);
 }

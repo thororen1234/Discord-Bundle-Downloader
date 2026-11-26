@@ -51,6 +51,7 @@ export const Config = {
     archiveThreads: intEnv("ARCHIVE_THREADS", 4),
     archiveCompressionLevel: intEnv("ARCHIVE_COMPRESSION_LEVEL", 3),
     sevenZipPath: process.env.SEVEN_ZIP_PATH || null,
+    zstdPath: process.env.ZSTD_PATH || "zstd",
     archiveTtlMs: 7 * 24 * 60 * 60 * 1000,
     moduleCacheMaxBytes: intEnv("MODULE_CACHE_MAX_GB", 20) * 1024 ** 3,
     userAgent: "Discord-Bundle-Downloader/1.0",
