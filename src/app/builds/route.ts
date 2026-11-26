@@ -20,6 +20,6 @@ export async function GET(request: Request) {
     const page = list.slice(Math.max(0, end - limit), end).reverse();
     return msgpackResponse({
         builds: page.map(meta => Array.from(packMetadataZst(meta))),
-        ...end > limit && { nextCursor: page.at(-1)!.firstSeen },
+        ...end > limit && { nextCursor: BigInt(page.at(-1)!.firstSeen) },
     });
 }
