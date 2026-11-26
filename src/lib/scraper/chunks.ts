@@ -30,7 +30,14 @@ function parseChunkInVm(code: string): Record<string, string> {
         for (const [id, factory] of Object.entries(chunkModules ?? {})) modules[id] = factoryToString(factory);
     };
     const chunkArray = Object.assign(collect, { push: ([ids, chunkModules]: [unknown, Record<string, unknown>]) => collect(ids, chunkModules) });
-    const ctx = vm.createContext({ [CHUNK_GLOBAL]: chunkArray, [JSONP_GLOBAL]: chunkArray });
+    const ctx = vm.createContext({
+        [CHUNK_GLOBAL]: chunkArray,
+        [JSONP_GLOBAL]: chunkArray,
+        importScripts: () => { },
+        addEventListener: () => { },
+        removeEventListener: () => { },
+        postMessage: () => { },
+    });
     ctx.window = ctx;
     ctx.self = ctx;
     vm.runInContext(code, ctx, { timeout: 30_000 });
