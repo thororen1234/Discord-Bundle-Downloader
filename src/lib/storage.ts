@@ -118,6 +118,8 @@ export async function writeFullBundle(bundle: FullBundle): Promise<void> {
         moduleSources: bundle.moduleSources,
         modules: idKeyed(bundle.modules),
         envVarText: bundle.envVarText,
+        experiments: bundle.experiments ?? [],
+        cssChunks: bundle.cssChunks ?? {},
     }));
     await writeMetadata(bundle.metadata);
 }

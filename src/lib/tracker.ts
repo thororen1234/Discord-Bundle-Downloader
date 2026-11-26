@@ -1,6 +1,7 @@
 import { getArchive, invalidateArchive } from "./archive";
 import type { BuildIndex } from "./buildIndex";
 import { APP_ORIGINS, Config } from "./config";
+import { writeIntl } from "./intl";
 import { writeModuleStore } from "./moduleStore";
 import { scrapeFullBundle, type ScrapeProgress } from "./scraper";
 import { readFullBundle, writeFullBundle } from "./storage";
@@ -151,6 +152,7 @@ export class Tracker {
             job.progress = { stage: "Saving", chunksDone: 0, chunksTotal: 0 };
             await writeModuleStore(bundle);
             await writeFullBundle(bundle);
+            await writeIntl(buildHash, bundle);
             this.index.add(bundle.metadata);
             this.failures.delete(buildHash);
 

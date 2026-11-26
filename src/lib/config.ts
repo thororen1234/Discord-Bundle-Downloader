@@ -52,6 +52,7 @@ export const Config = {
     archiveCompressionLevel: intEnv("ARCHIVE_COMPRESSION_LEVEL", 3),
     sevenZipPath: process.env.SEVEN_ZIP_PATH || null,
     zstdPath: process.env.ZSTD_PATH || "zstd",
+    redisUrl: process.env.REDIS_URL || null,
     archiveTtlMs: 7 * 24 * 60 * 60 * 1000,
     moduleCacheMaxBytes: intEnv("MODULE_CACHE_MAX_GB", 20) * 1024 ** 3,
     userAgent: "Discord-Bundle-Downloader/1.0",
@@ -61,7 +62,8 @@ export const Config = {
     vendettaWebhookPort: intEnv("VENDETTA_WEBHOOK_PORT", 8485),
     hermesDecompilerPath: process.env.HERMES_DECOMPILER_PATH || "hbc-decompiler",
     compactAfterMs: intEnv("COMPACT_AFTER_DAYS", 30) * 24 * 60 * 60 * 1000,
-    keepLatestBuilds: intEnv("KEEP_LATEST_BUILDS", Infinity),
+    keepLatestBuilds: process.env.KEEP_LATEST_BUILDS === "0" ? Infinity : intEnv("KEEP_LATEST_BUILDS", Infinity),
+    intlKeysUrl: process.env.INTL_KEYS_URL == null ? "https://sadan.zip/assets/key-mappings.json" : urlEnv("INTL_KEYS_URL"),
 };
 
 export const APP_ORIGINS: Record<Channel, string> = {

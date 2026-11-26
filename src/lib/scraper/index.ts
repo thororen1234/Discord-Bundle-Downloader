@@ -1,8 +1,11 @@
 import { APP_ORIGINS, Config } from "../config";
 import type { Channel, FullBundle } from "../types";
 import { loadLazyChunks } from "./chunks";
+import { loadCssChunks } from "./css";
 import { computeDepInfo } from "./deps";
+import { findExperiments } from "./experiments";
 import { parseAppHtml } from "./html";
+import { findDefaultIconProps } from "./icons";
 import { findBuildNumber, loadMainChunk } from "./webpack";
 
 export interface ScrapeProgress {
@@ -72,6 +75,15 @@ export async function scrapeFullBundle({ channel, buildHash, html, onProgress }:
         throw new Error(`${lazyChunks.failed.length}/${totalChunks} chunks failed to load`);
     }
 
+    progress("Loading CSS chunks");
+    const cssChunks = await loadCssChunks({
+        assetBase,
+        files: [...parsed.stylesheetFiles, ...mainChunk.cssChunkFiles],
+        concurrency: Config.chunkConcurrency,
+        userAgent: Config.userAgent,
+        onProgress: (done, total) => progress("Loading CSS chunks", done, total),
+    });
+
     const modules = { ...mainChunk.modules, ...lazyChunks.modules };
     const moduleSources = {
         [webJsFile]: Object.keys(mainChunk.modules).map(Number),
@@ -80,6 +92,7 @@ export async function scrapeFullBundle({ channel, buildHash, html, onProgress }:
 
     progress("Resolving module dependencies");
     const depInfo = computeDepInfo(modules);
+    depInfo.keyModules.defaultIconProps = findDefaultIconProps(modules);
 
     console.log(
         `[scraper] ${channel} ${buildHash}: ${Object.keys(modules).length} modules from ${Object.keys(moduleSources).length} chunks`
@@ -98,5 +111,7 @@ export async function scrapeFullBundle({ channel, buildHash, html, onProgress }:
         moduleSources,
         modules,
         envVarText: globalEnvText,
+        experiments: findExperiments(modules),
+        cssChunks,
     };
 }

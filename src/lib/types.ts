@@ -1,3 +1,5 @@
+import type { Experiment } from "./scraper/experiments";
+
 export type Channel = "stable" | "ptb" | "canary";
 
 export const CHANNELS: readonly Channel[] = ["stable", "ptb", "canary"];
@@ -18,7 +20,7 @@ export interface ModuleDeps {
 }
 
 export interface DepInfo {
-    keyModules: { fluxDispatcherClass: [number, string][]; };
+    keyModules: { fluxDispatcherClass: [number, string][]; defaultIconProps?: [number, string][]; };
     moduleDeps: Record<string, ModuleDeps>;
 }
 
@@ -28,6 +30,8 @@ export interface FullBundle {
     moduleSources: Record<string, number[]>;
     modules: Record<string, string>;
     envVarText: string;
+    experiments?: Experiment[];
+    cssChunks?: Record<string, string>;
 }
 
 export function isChannel(value: unknown): value is Channel {

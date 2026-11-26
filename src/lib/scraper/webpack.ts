@@ -1,16 +1,18 @@
 import { WebpackMainChunkParser } from "@vencord-companion/webpack-chunk-parser";
+import { type BinaryExpression, isBinaryExpression, isPropertyAccessExpression, SyntaxKind } from "typescript";
 import vm from "vm";
 
 export interface MainChunk {
     modules: Record<string, string>;
     chunkIds: string[];
     chunkFile(chunkId: string): string | null;
+    cssChunkFiles: string[];
     buildNumber: number;
     entryPoint: number | null;
 }
 
 type ChunkUrlFn = (chunkId: unknown) => string;
-type WebpackRequire = { m: Record<string, unknown>; };
+type WebpackRequire = { m: Record<string, unknown>; k?: ChunkUrlFn; };
 type CaptureContext = vm.Context & {
     __origU?: ChunkUrlFn;
     __wreq?: WebpackRequire;
@@ -48,12 +50,37 @@ const GET_CHUNK_IDS = `(() => {
 })()`;
 
 const TERNARY_CHUNK_RE = /"([^"]+)"===[\w$]+\?/g;
+const INLINE_CSS_CHUNK_RE = /(")?(\d+)\1===[\w$]+[?)]/g;
 export const CHUNK_LOAD_RE = /\.e\("?([^")]+?)"?\)/g;
 const BUILD_NUMBER_RE = /build_number:"(\d+)"/;
 const LEGACY_BUILD_NUMBER_RE = /([\w$]+)=parseInt\("(\d+)",10\)[\s\S]{0,500}?client_build_number=\1\b/;
 const ENV_BUILD_NUMBER_RE = /"BUILD_NUMBER":"(\d+)"/;
 const JSONP_CHUNK_MAP_RE = /\{((?:\d+:"[0-9a-f]+",?)+)\}\[[\w$]+\]\+"\.js"/;
 const ENTRYPOINT_RES = [/=>\s*[\w$]+\((\d+)\)\)/g, /[\w$]+\([\w$]+\.s=(\d+)\)/g];
+
+function listCssChunkFiles(source: string | undefined): string[] {
+    if (!source) return [];
+    const ctx = vm.createContext({}) as CaptureContext;
+    try {
+        vm.runInContext(`globalThis.__origU = (${source});`, ctx, { timeout: 5_000 });
+    } catch {
+        return [];
+    }
+    const { __origU: cssChunkUrl } = ctx;
+    if (typeof cssChunkUrl !== "function") return [];
+
+    const chunkIds: unknown[] = vm.runInContext(GET_CHUNK_IDS, ctx);
+    for (const [, quote, id] of source.matchAll(INLINE_CSS_CHUNK_RE)) chunkIds.push(quote ? id : Number(id));
+
+    const files = new Set<string>();
+    for (const chunkId of chunkIds) {
+        try {
+            const file = cssChunkUrl(chunkId);
+            if (typeof file === "string" && file.endsWith(".css") && !file.startsWith("undefined")) files.add(file);
+        } catch { }
+    }
+    return [...files];
+}
 
 function fromVencordParser(code: string, globalEnvText: string): MainChunk | null {
     const parser = new WebpackMainChunkParser(code);
@@ -64,6 +91,10 @@ function fromVencordParser(code: string, globalEnvText: string): MainChunk | nul
         parser.getJsChunkHashes().map(([id, hash]) => [id, `${hash}.js`]),
     );
     const entryPoint = Number(parser.getEntrypointId());
+    const cssChunkUrl = parser.__webpack_require__?.uses
+        .map(({ location }) => location.parent.parent)
+        .find((node): node is BinaryExpression => isBinaryExpression(node) && node.operatorToken.kind === SyntaxKind.EqualsToken
+            && isPropertyAccessExpression(node.left) && node.left.name.text === "k");
     const buildNumber = Number(
         parser.getBuildNumber() ?? ENV_BUILD_NUMBER_RE.exec(globalEnvText)?.[1] ?? 0,
     );
@@ -72,6 +103,7 @@ function fromVencordParser(code: string, globalEnvText: string): MainChunk | nul
         modules,
         chunkIds: [...chunkFiles.keys()],
         chunkFile: chunkId => chunkFiles.get(chunkId) ?? null,
+        cssChunkFiles: listCssChunkFiles(cssChunkUrl?.right.getText()),
         buildNumber,
         entryPoint: Number.isFinite(entryPoint) ? entryPoint : null,
     };
@@ -86,6 +118,7 @@ function fromJsonpRuntime(code: string, globalEnvText: string): MainChunk | null
         modules: {},
         chunkIds: [...chunkFiles.keys()],
         chunkFile: chunkId => chunkFiles.get(chunkId) ?? null,
+        cssChunkFiles: [],
         buildNumber: Number(ENV_BUILD_NUMBER_RE.exec(globalEnvText)?.[1] ?? 0),
         entryPoint: null,
     };
@@ -138,6 +171,7 @@ function fromRuntime(code: string, globalEnvText: string, filename: string): Mai
                 return null;
             }
         },
+        cssChunkFiles: listCssChunkFiles(wreq.k && String(wreq.k)),
         buildNumber: Number(BUILD_NUMBER_RE.exec(code)?.[1] ?? ENV_BUILD_NUMBER_RE.exec(globalEnvText)?.[1] ?? 0),
         entryPoint: findEntryPoint(code),
     };

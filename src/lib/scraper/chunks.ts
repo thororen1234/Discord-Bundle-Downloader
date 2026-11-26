@@ -44,7 +44,7 @@ function parseChunkInVm(code: string): Record<string, string> {
     return modules;
 }
 
-async function fetchText(url: string, userAgent: string): Promise<string | null> {
+export async function fetchText(url: string, userAgent: string): Promise<string | null> {
     for (let attempt = 0; ; attempt++) {
         try {
             const response = await fetch(url, { headers: { "User-Agent": userAgent } });

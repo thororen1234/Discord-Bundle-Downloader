@@ -3,6 +3,7 @@ import type { AndroidBuild } from "./android/types";
 import { sweepArchives } from "./archive";
 import { BuildIndex } from "./buildIndex";
 import { persistent } from "./global";
+import { syncIntlKeys } from "./intlKeys";
 import { sweepModuleStores } from "./moduleStore";
 import { ensureBuildsDir } from "./storage";
 
@@ -15,6 +16,7 @@ interface Services {
 }
 
 const ARCHIVE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+const INTL_KEYS_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const INDEX_REFRESH_MS = 5 * 1000;
 
 function services(): Services {
@@ -71,4 +73,8 @@ export async function startBackgroundJobs(): Promise<void> {
     ]);
     void sweep();
     setInterval(sweep, ARCHIVE_SWEEP_INTERVAL_MS).unref();
+
+    const syncKeys = () => syncIntlKeys().catch(e => console.error("[intl] key sync failed:", e));
+    void syncKeys();
+    setInterval(syncKeys, INTL_KEYS_SYNC_INTERVAL_MS).unref();
 }
