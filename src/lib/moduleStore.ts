@@ -45,6 +45,7 @@ export interface SearchResult {
 
 const stores = persistent("moduleStores", () => new Map<string, Promise<ModuleStore>>());
 const touchedAt = persistent("moduleStoresTouchedAt", () => new Map<string, number>());
+const builds = persistent("moduleStoreBuilds", () => ({ tail: Promise.resolve() }));
 
 async function pool<T>(items: T[], run: (item: T, i: number) => Promise<void>): Promise<void> {
     let next = 0;
@@ -195,9 +196,14 @@ async function loadModuleStore(buildHash: string): Promise<ModuleStore> {
     const indexFile = path.join(dir, MODULE_INDEX_FILE_NAME);
     let index = await readIndex(indexFile);
     if (!index) {
-        const start = performance.now();
-        await writeModuleStore(await readFullBundle(buildHash));
-        console.log(`[modules] built store for ${buildHash} in ${((performance.now() - start) / 1000).toFixed(1)}s`);
+        const build = builds.tail.then(async () => {
+            if (await readIndex(indexFile)) return;
+            const start = performance.now();
+            await writeModuleStore(await readFullBundle(buildHash));
+            console.log(`[modules] built store for ${buildHash} in ${((performance.now() - start) / 1000).toFixed(1)}s`);
+        });
+        builds.tail = build.catch(() => { });
+        await build;
         index = await readIndex(indexFile);
         if (!index) throw new Error(`module store for ${buildHash} is unreadable`);
     }
