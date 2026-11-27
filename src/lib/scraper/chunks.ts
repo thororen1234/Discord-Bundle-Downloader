@@ -37,6 +37,18 @@ function parseChunkInVm(code: string): Record<string, string> {
         addEventListener: () => { },
         removeEventListener: () => { },
         postMessage: () => { },
+        // worker runtimes start async loads that reject outside any handler and would kill the process
+        Promise: class {
+            then() { return this; }
+            catch() { return this; }
+            finally() { return this; }
+            static all() { return new this(); }
+            static allSettled() { return new this(); }
+            static any() { return new this(); }
+            static race() { return new this(); }
+            static resolve() { return new this(); }
+            static reject() { return new this(); }
+        },
     });
     ctx.window = ctx;
     ctx.self = ctx;
@@ -87,7 +99,7 @@ export async function loadLazyChunks(options: ChunkLoaderOptions): Promise<Loade
             try {
                 modules = new WebpackLazyChunkParser(code).getDefinedModules();
             } catch (error) {
-                console.warn(`[scraper] failed to parse chunk ${file}:`, error);
+                console.warn(`[scraper] failed to parse chunk ${file}: ${(error as Error).message}`);
             }
         }
         if (!modules || !Object.keys(modules).length) {
@@ -95,7 +107,7 @@ export async function loadLazyChunks(options: ChunkLoaderOptions): Promise<Loade
                 try {
                     modules = parseChunkInVm(code);
                 } catch (error) {
-                    console.warn(`[scraper] failed to parse chunk ${file}:`, error);
+                    console.warn(`[scraper] failed to parse chunk ${file}: ${(error as Error).message}`);
                 }
             }
         }
