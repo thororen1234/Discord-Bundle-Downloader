@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
             { source: "/builds", headers: CORS_HEADERS },
             { source: "/version", headers: CORS_HEADERS },
             { source: "/android/:path*", headers: CORS_HEADERS },
+            { source: "/intl/:path*", headers: CORS_HEADERS },
         ];
     },
 };
